@@ -5,7 +5,7 @@ const DEFAULT_PORT: int = 24567
 const MAX_PLAYERS: int = 2
 
 const PLAYER_MAX_HEALTH: float = 100.0
-const PLAYER_MOVE_SPEED: float = 180.0
+const PLAYER_MOVE_SPEED: float = 225.0
 
 # Physics layer bits, mirroring project.godot's layer_names.
 const LAYER_PLAYERS: int = 1 << 0
