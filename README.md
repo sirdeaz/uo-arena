@@ -7,15 +7,20 @@ cover. Godot 4, GDScript. 1v1 first, team modes later.
 > **Early prototype.** Single-player against a practice dummy — there is no multiplayer
 > yet. It exists to prove the feel is achievable, not to be a game.
 
-## Just want to try it?
+## ▶ Play it in your browser
 
-**[Download the latest Windows build](../../releases/latest)** — no GitHub account
-needed. Unzip, double-click `UOArena.exe`, and read `READ ME FIRST.txt`. It's unsigned,
-so Windows will show a "more info → run anyway" prompt.
+### **[sirdeaz.github.io/uo-arena](https://sirdeaz.github.io/uo-arena/)**
+
+Nothing to download or install, works on Windows, macOS and Linux, and it's always the
+latest version — every push to `main` republishes it automatically.
 
 Hold **right mouse** to walk toward the cursor, **1**–**5** to cast, **R** to reset.
 Watch the words above a caster's head: `Kal Vas Flam` means a flamestrike is 2.5 seconds
 away and you should get behind a tent.
+
+Prefer a native build? **[Download the Windows version](../../releases/latest)** — unzip,
+double-click `UOArena.exe`. It's unsigned, so Windows shows a "more info → run anyway"
+prompt. The browser link avoids that entirely.
 
 ## Requirements
 
