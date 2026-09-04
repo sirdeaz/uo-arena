@@ -1,6 +1,10 @@
 extends Node
 
 func _ready() -> void:
+	if "--test" in OS.get_cmdline_args() or "--test" in OS.get_cmdline_user_args():
+		# The test runner supplies its own scene; don't route away from it.
+		return
+
 	var scene := "res://client/client_main.tscn"
 	if _is_server_role():
 		scene = "res://server/server_main.tscn"

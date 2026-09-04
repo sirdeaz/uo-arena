@@ -35,6 +35,17 @@ Run as server locally:
 godot --headless -- --server
 ```
 
+## Tests
+
+```bash
+powershell -File run_tests.ps1
+```
+
+Headless, no external test framework — `tests/test_main.gd` discovers every
+`tests/test_*.gd`, runs each `test_*` method, and exits non-zero on failure. Tests run
+against real physics bodies and real `Combatant`/`EntityState` instances rather than
+mocks, since the behaviour under test is how those pieces interact.
+
 ## Spells
 
 | Spell | Cast time | Effect | Duration |
@@ -50,7 +61,7 @@ placeholders and still need balancing.
 
 ## Build order
 
-1. `server/combat_resolver.gd` — line-of-sight raycast + hit resolution
+1. ~~`server/combat_resolver.gd` — line-of-sight raycast + hit resolution~~ ✅
 2. `server/arena_map.tscn` — Minoc tents map with real cover (can overlap with 1)
 3. `autoload/network_manager.gd` — ENet multiplayer wiring, 2 players
 4. `client/cast_bar_ui.gd` — casting feedback driven purely by `EntityState` signals
