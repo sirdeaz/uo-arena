@@ -161,7 +161,8 @@ func _update_hud() -> void:
 	var status := _describe(player.combatant.entity_state)
 
 	var lines := [
-		"WASD move    1-5 cast    R reset",
+		"hold RIGHT MOUSE to move toward the cursor    R reset",
+		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze",
 		"",
 		"you %d    dummy %d" % [
 			roundi(player.combatant.health), roundi(dummy.combatant.health)
@@ -191,3 +192,9 @@ func _draw_sight_line() -> void:
 		Color("#7ee081", 0.55) if clear else Color("#e2574c", 0.30),
 		2.0
 	)
+
+	# Where you are steering, while the move button is down.
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		var cursor := _sight_line.get_global_mouse_position()
+		_sight_line.draw_arc(cursor, 9.0, 0.0, TAU, 20, Color("#6ec6ff", 0.7), 2.0, true)
+		_sight_line.draw_line(player.position, cursor, Color("#6ec6ff", 0.22), 1.0)

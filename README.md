@@ -58,11 +58,12 @@ powershell -File run_game.ps1
 server.) The client boots straight into `client/scenes/local_test.tscn` — a local,
 network-free harness against a dummy that casts magic arrow at you on a loop.
 
-| Key | |
+| Input | |
 | --- | --- |
-| `WASD` | move (you can move freely while casting) |
+| hold right mouse | walk toward the cursor, UO-style — works freely while casting |
 | `1`–`5` | magic arrow, poison, lightning, flamestrike, paralyze |
 | `R` | reset the round |
+| `WASD` | keyboard fallback, kept for testing |
 
 The line between you and the dummy is the actual raycast the resolver uses — green when
 it has a shot, red when cover is breaking it. Stand in the open and the dummy will

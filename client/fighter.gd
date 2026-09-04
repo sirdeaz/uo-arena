@@ -8,6 +8,10 @@ class_name Fighter
 const RADIUS: float = 18.0
 const HEALTH_BAR_WIDTH: float = 52.0
 
+## Cursor distance below which holding the move button does nothing. Without it a
+## cursor resting on your own feet flips direction every frame and you vibrate.
+const MOUSE_DEAD_ZONE: float = 16.0
+
 @export var body_color: Color = Color("#6ec6ff")
 @export var player_controlled: bool = false
 
@@ -43,7 +47,20 @@ func _physics_process(delta: float) -> void:
 	queue_redraw()
 
 
+## Direction to steer in when the cursor is at `target`, or zero inside the dead zone.
+static func movement_direction_toward(from: Vector2, target: Vector2) -> Vector2:
+	var offset := target - from
+	if offset.length() <= MOUSE_DEAD_ZONE:
+		return Vector2.ZERO
+	return offset.normalized()
+
+
 func _input_direction() -> Vector2:
+	# UO steering: hold the right mouse button and walk toward the cursor.
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		return movement_direction_toward(global_position, get_global_mouse_position())
+
+	# WASD kept as a convenience for testing; UO itself has no keyboard movement.
 	var direction := Vector2.ZERO
 	if Input.is_physical_key_pressed(KEY_D):
 		direction.x += 1.0
