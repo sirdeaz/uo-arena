@@ -1,0 +1,44 @@
+UO ARENA - quick demo build
+===========================
+
+TO PLAY
+  Double-click UOArena.exe
+
+  Windows will probably show a blue "Windows protected your PC" box, because
+  this is an unsigned hobby build. Click "More info", then "Run anyway".
+
+  Keep both files in the same folder - the .exe needs the .pck next to it.
+
+
+CONTROLS
+  Hold RIGHT MOUSE   walk toward the cursor (you can move while casting)
+  1 2 3 4 5          magic arrow / poison / lightning / flamestrike / paralyze
+  R                  reset the round
+  Alt+F4             quit
+
+
+WHAT AM I LOOKING AT
+  You are the blue circle on the left. The red one is a practice dummy that
+  casts magic arrow at you on a loop.
+
+  The line between you is the game's actual line-of-sight check. Green means
+  there is a clear shot; red means cover is breaking it.
+
+  While someone casts, they speak the spell's words overhead - "Kal Vas Flam"
+  is a flamestrike, and it takes 2.5 seconds. That is your warning to get
+  behind a tent.
+
+
+TRY THIS
+  1. Stand still in the open and hold 4. You will get interrupted every time.
+     Any damage breaks a cast, and there is no refund.
+
+  2. Press 4, then immediately press 3. The flamestrike fizzles into a
+     lightning. Spam it and you will cast nothing at all - that is deliberate,
+     and it is also how you bait someone into dodging early.
+
+  3. Walk off the middle lane while the dummy is casting. Watch the line turn
+     red and its spells stop landing.
+
+
+This is an early prototype - one arena, one dummy, no multiplayer yet.

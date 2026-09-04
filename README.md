@@ -48,6 +48,29 @@ The chain is a feint tool, not just a punishment — a stream of cast-starts tha
 resolve baits an opponent into breaking line of sight or committing early. It also
 means spam-casting lands nothing at all.
 
+## Giving it to someone who doesn't code
+
+```bash
+powershell -File build.ps1
+```
+
+Produces two things, neither of which needs Godot, a GitHub account, or this repo:
+
+- `build/UOArena-win64.zip` (~36 MB) — send it however you like. They unzip and
+  double-click `UOArena.exe`. It ships with a plain-English `READ ME FIRST.txt`.
+  Windows only, and unsigned, so SmartScreen shows a "more info → run anyway"
+  click-through.
+- `build/web/` — a browser build. Upload the folder to any static host and send the
+  link; it plays in a tab on any OS with nothing to install. Exported without thread
+  support on purpose, so it works on plain static hosting with no special headers.
+
+Both are verified working: the exe runs standalone, and in-browser the keyboard
+casting, right-click steering, and cast-while-moving all behave (Godot suppresses the
+browser context menu, so right-click-to-move is safe).
+
+Building needs Godot's export templates for the matching engine version — see the
+header of `build.ps1`.
+
 ## Playing it
 
 ```bash

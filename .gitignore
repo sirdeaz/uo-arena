@@ -5,7 +5,9 @@
 # Exported builds
 /build/
 /export/
-export_presets.cfg
+
+# export_presets.cfg IS committed. Godot ignores it by default because it can hold
+# signing credentials — ours holds none, and committing it keeps builds reproducible.
 
 # OS / editor cruft
 .DS_Store
