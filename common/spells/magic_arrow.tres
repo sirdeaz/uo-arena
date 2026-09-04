@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="SpellData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://common/spells/spell_data.gd" id="1_spell_data"]
+
+[resource]
+script = ExtResource("1_spell_data")
+spell_name = "Magic Arrow"
+cast_time_seconds = 1.0
+fizzle_window_seconds = 0.25
+damage = 12.0
+effect_type = 0
+effect_duration_seconds = 0.0
+requires_line_of_sight = true

@@ -1,0 +1,21 @@
+# Godot 4 auto-generated
+.godot/
+/android/
+
+# Exported builds
+/build/
+/export/
+export_presets.cfg
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+.idea/
+
+# Mono / C# (only if the project ever switches)
+.mono/
+data_*/
+*.csproj
+*.sln
