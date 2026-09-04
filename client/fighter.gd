@@ -14,10 +14,19 @@ const MOUSE_DEAD_ZONE: float = 16.0
 
 const MANTRA_COLOR := Color("#dcd0ff")
 
+## How long the release / fizzle / interrupt burst stays on screen.
+const BURST_SECONDS: float = 0.4
+const RUNE_COUNT: int = 3
+
 @export var body_color: Color = Color("#6ec6ff")
 @export var player_controlled: bool = false
 
 var combatant: Combatant
+
+var _anim_time: float = 0.0
+var _burst_remaining: float = 0.0
+var _burst_color: Color = Color.WHITE
+var _burst_expands: bool = true
 
 
 func _ready() -> void:
@@ -35,9 +44,28 @@ func _ready() -> void:
 
 	combatant.position = global_position
 
+	var state := combatant.entity_state
+	state.cast_completed.connect(
+		func(spell: SpellData) -> void: _burst(SpellVisuals.color_for(spell), true)
+	)
+	state.cast_fizzled.connect(
+		func(_spell: SpellData, _reason: String) -> void: _burst(Color("#8a8f9c"), false)
+	)
+	state.cast_interrupted.connect(
+		func(_spell: SpellData) -> void: _burst(Color("#ffa447"), false)
+	)
+
+
+func _burst(color: Color, expands: bool) -> void:
+	_burst_color = color
+	_burst_expands = expands
+	_burst_remaining = BURST_SECONDS
+
 
 func _physics_process(delta: float) -> void:
 	combatant.tick_status(delta)
+	_anim_time += delta
+	_burst_remaining = maxf(0.0, _burst_remaining - delta)
 
 	var direction := Vector2.ZERO
 	if player_controlled and combatant.can_move():
@@ -76,6 +104,9 @@ func _input_direction() -> Vector2:
 
 
 func _draw() -> void:
+	_draw_cast_animation()
+	_draw_burst()
+
 	draw_circle(Vector2.ZERO, RADIUS, body_color)
 	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 32, body_color.darkened(0.4), 2.0, true)
 
@@ -86,6 +117,63 @@ func _draw() -> void:
 
 	_draw_health_bar()
 	_draw_mantra()
+
+
+## Charging animation: a glow that brightens, a ring that fills with cast progress, and
+## runes that orbit faster and draw inward as the spell nears release. All of it is
+## keyed to real cast progress, so it doubles as a read on how far along they are.
+func _draw_cast_animation() -> void:
+	var state := combatant.entity_state
+
+	if state.current_state == EntityState.State.RECOVERING:
+		var recovery := state.recovery_time_elapsed / Constants.GLOBAL_CAST_RECOVERY_SECONDS
+		draw_arc(
+			Vector2.ZERO, RADIUS + 8.0, 0.0, TAU, 32,
+			Color("#8a8f9c", 0.35 * (1.0 - recovery)), 2.0, true
+		)
+		return
+
+	if state.current_state != EntityState.State.CASTING:
+		return
+
+	var progress := clampf(
+		state.cast_time_elapsed / state.current_spell.cast_time_seconds, 0.0, 1.0
+	)
+	var color := SpellVisuals.color_for(state.current_spell)
+
+	# Gathering glow beneath the caster.
+	var pulse := 1.0 + sin(_anim_time * 9.0) * 0.06
+	draw_circle(
+		Vector2.ZERO, (RADIUS + 10.0) * pulse, Color(color, 0.10 + progress * 0.22)
+	)
+
+	# Progress ring, filling clockwise from the top.
+	draw_arc(
+		Vector2.ZERO, RADIUS + 9.0, -PI * 0.5, -PI * 0.5 + TAU * progress, 48,
+		Color(color, 0.9), 3.0, true
+	)
+
+	# Runes orbiting faster and tighter as the spell comes together.
+	var orbit := (RADIUS + 22.0) - progress * 10.0
+	var spin := _anim_time * (2.0 + progress * 6.0)
+	for i in RUNE_COUNT:
+		var angle := spin + TAU * float(i) / float(RUNE_COUNT)
+		draw_circle(
+			Vector2(orbit, 0).rotated(angle), 2.5 + progress * 1.5, Color(color, 0.95)
+		)
+
+
+## Release, fizzle or interrupt. A completed cast throws a ring outward; a failed one
+## collapses inward, so the two read differently at a glance.
+func _draw_burst() -> void:
+	if _burst_remaining <= 0.0:
+		return
+	var fade := _burst_remaining / BURST_SECONDS
+	var radius := (RADIUS + 6.0) + (1.0 - fade) * 26.0 if _burst_expands \
+		else (RADIUS + 26.0) * fade
+	draw_arc(
+		Vector2.ZERO, maxf(radius, 1.0), 0.0, TAU, 32, Color(_burst_color, fade), 3.0, true
+	)
 
 
 ## The spoken words, overhead, for as long as the cast runs. This is the opponent's

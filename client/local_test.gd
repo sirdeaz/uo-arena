@@ -19,14 +19,6 @@ const SPELL_KEYS := {
 const DUMMY_THINK_SECONDS: float = 0.9
 const EFFECT_SECONDS: float = 0.55
 
-const SPELL_COLORS := {
-	"Magic Arrow": Color("#9fd8ff"),
-	"Poison": Color("#7ee081"),
-	"Lightning": Color("#fff2a8"),
-	"Flamestrike": Color("#ff8a4c"),
-	"Paralyze": Color("#ffd166"),
-}
-
 var map: ArenaMap
 var resolver: CombatResolver
 var player: Fighter
@@ -118,7 +110,7 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 		_effects.append({
 			"from": from.position,
 			"to": to.position,
-			"color": SPELL_COLORS.get(spell.spell_name, Color.WHITE) as Color,
+			"color": SpellVisuals.color_for(spell),
 			"remaining": EFFECT_SECONDS,
 		})
 
