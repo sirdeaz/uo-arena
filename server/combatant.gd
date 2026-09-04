@@ -39,6 +39,12 @@ func is_paralyzed() -> bool:
 	return paralyze_seconds_remaining > 0.0
 
 
+## Casting never pins you — moving while casting is the whole premise. Paralyze is the
+## only thing that stops your feet, and it leaves you free to keep casting.
+func can_move() -> bool:
+	return is_alive() and not is_paralyzed()
+
+
 func take_damage(amount: float) -> void:
 	if amount <= 0.0:
 		return

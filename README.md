@@ -51,6 +51,22 @@ The chain is a feint tool, not just a punishment — a stream of cast-starts tha
 resolve baits an opponent into breaking line of sight or committing early. It also
 means spam-casting lands nothing at all.
 
+## Playing it
+
+Run the project (F5 in the editor, or `godot` from this folder). The client boots
+straight into `client/scenes/local_test.tscn` — a local, network-free harness against a
+dummy that casts magic arrow at you on a loop.
+
+| Key | |
+| --- | --- |
+| `WASD` | move (you can move freely while casting) |
+| `1`–`5` | magic arrow, poison, lightning, flamestrike, paralyze |
+| `R` | reset the round |
+
+The line between you and the dummy is the actual raycast the resolver uses — green when
+it has a shot, red when cover is breaking it. Stand in the open and the dummy will
+interrupt whatever you're casting; step behind a tent and its casts fail silently.
+
 ## Arena
 
 `server/arena_map.tscn` is 1200×800 with spawns at `(±500, 0)` — about 5.5s apart at
