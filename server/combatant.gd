@@ -44,6 +44,8 @@ func take_damage(amount: float) -> void:
 		return
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health)
+	# Any damage that lands breaks a spell — direct hits and poison ticks alike.
+	entity_state.interrupt_cast()
 	if health == 0.0:
 		died.emit()
 

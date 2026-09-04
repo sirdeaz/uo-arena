@@ -57,6 +57,28 @@ func test_poison_does_not_tick_past_its_duration() -> void:
 	assert_almost_eq(combatant.health, 94.0, "2s of poison is 6 damage, not 30")
 
 
+func test_poison_tick_interrupts_an_in_progress_cast() -> void:
+	combatant.entity_state.try_start_cast(load("res://common/spells/flamestrike.tres"))
+	combatant.apply_poison(8.0, 3.0)
+	combatant.tick_status(1.0)
+	assert_eq(
+		combatant.entity_state.current_state,
+		EntityState.State.INTERRUPTED,
+		"a poison tick is damage, so it should break a cast"
+	)
+
+
+func test_poison_between_ticks_does_not_interrupt() -> void:
+	combatant.entity_state.try_start_cast(load("res://common/spells/flamestrike.tres"))
+	combatant.apply_poison(8.0, 3.0)
+	combatant.tick_status(0.5)
+	assert_eq(
+		combatant.entity_state.current_state,
+		EntityState.State.CASTING,
+		"being poisoned shouldn't block casting between ticks"
+	)
+
+
 func test_paralyze_expires_after_its_duration() -> void:
 	combatant.apply_paralyze(4.0)
 	combatant.tick_status(4.0)
