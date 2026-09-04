@@ -9,12 +9,9 @@ cover. Godot 4, GDScript. 1v1 first, team modes later.
 - Godot 4.x (installed here via `winget install GodotEngine.GodotEngine`)
 - Git
 
-Godot is not on `PATH` after a winget install. Either add its folder to `PATH` or call it
-by full path:
-
-```bash
-"$LOCALAPPDATA/Microsoft/WinGet/Packages/GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe/Godot_v4.7.2-stable_win64_console.exe" --version
-```
+Godot is **not** on `PATH` after a winget install, so `godot` alone won't work. The
+`run_game.ps1` and `run_tests.ps1` scripts locate it for you; set `GODOT_BIN` to override
+which executable they use.
 
 ## Layout
 
@@ -53,9 +50,13 @@ means spam-casting lands nothing at all.
 
 ## Playing it
 
-Run the project (F5 in the editor, or `godot` from this folder). The client boots
-straight into `client/scenes/local_test.tscn` — a local, network-free harness against a
-dummy that casts magic arrow at you on a loop.
+```bash
+powershell -File run_game.ps1
+```
+
+(`-Editor` opens the Godot editor instead, `-Server` runs headless as a dedicated
+server.) The client boots straight into `client/scenes/local_test.tscn` — a local,
+network-free harness against a dummy that casts magic arrow at you on a loop.
 
 | Key | |
 | --- | --- |
