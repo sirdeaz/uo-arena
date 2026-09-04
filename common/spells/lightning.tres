@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_spell_data")
 spell_name = "Lightning"
+mantra = "Por Ort Grav"
 cast_time_seconds = 1.75
 fizzle_window_seconds = 0.25
 damage = 20.0

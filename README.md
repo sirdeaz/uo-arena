@@ -69,6 +69,22 @@ The line between you and the dummy is the actual raycast the resolver uses — g
 it has a shot, red when cover is breaking it. Stand in the open and the dummy will
 interrupt whatever you're casting; step behind a tent and its casts fail silently.
 
+**Watch the words.** A caster speaks the spell's mantra overhead for the whole cast —
+`Kal Vas Flam` means a flamestrike is coming and you have 2.5s to get behind a tent.
+That's the read the fizzle chain exists to fake: start a cast, let them see the words,
+then fizzle into something else while they're already committed to dodging.
+
+| Spell | Mantra | Cast |
+| --- | --- | --- |
+| Magic Arrow | `In Por Ylem` | 1.0s |
+| Poison | `In Nox` | 1.5s |
+| Lightning | `Por Ort Grav` | 1.75s |
+| Flamestrike | `Kal Vas Flam` | 2.5s |
+| Paralyze | `An Ex Por` | 2.5s |
+
+Spells that connect draw a coloured bolt and an impact ring. Spells stopped by cover
+draw nothing at all — in UO a spell with no line simply never goes off.
+
 ## Arena
 
 `server/arena_map.tscn` is 1200×800 with spawns at `(±500, 0)` — about 5.5s apart at
@@ -96,16 +112,17 @@ mocks, since the behaviour under test is how those pieces interact.
 
 ## Spells
 
-| Spell | Cast time | Effect | Duration |
-| --- | --- | --- | --- |
-| Magic Arrow | 1.0s | damage | — |
-| Poison | 1.5s | poison | 8s |
-| Lightning | 1.75s | damage | — |
-| Flamestrike | 2.5s | damage | — |
-| Paralyze | 2.5s | paralyze | 4s |
+| Spell | Mantra | Cast time | Effect | Duration |
+| --- | --- | --- | --- | --- |
+| Magic Arrow | `In Por Ylem` | 1.0s | damage | — |
+| Poison | `In Nox` | 1.5s | poison | 8s tick |
+| Lightning | `Por Ort Grav` | 1.75s | damage | — |
+| Flamestrike | `Kal Vas Flam` | 2.5s | damage | — |
+| Paralyze | `An Ex Por` | 2.5s | paralyze | 4s |
 
-Cast times and durations come from the design doc. Damage values in the `.tres` files are
-placeholders and still need balancing.
+Cast times and durations come from the design doc; mantras are the real UO words, pinned
+by `tests/test_spell_data.gd`. Damage values in the `.tres` files are placeholders and
+still need balancing.
 
 ## Build order
 

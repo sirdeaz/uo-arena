@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_spell_data")
 spell_name = "Poison"
+mantra = "In Nox"
 cast_time_seconds = 1.5
 fizzle_window_seconds = 0.25
 damage = 3.0

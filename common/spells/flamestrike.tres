@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_spell_data")
 spell_name = "Flamestrike"
+mantra = "Kal Vas Flam"
 cast_time_seconds = 2.5
 fizzle_window_seconds = 0.25
 damage = 32.0

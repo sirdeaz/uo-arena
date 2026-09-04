@@ -12,6 +12,8 @@ const HEALTH_BAR_WIDTH: float = 52.0
 ## cursor resting on your own feet flips direction every frame and you vibrate.
 const MOUSE_DEAD_ZONE: float = 16.0
 
+const MANTRA_COLOR := Color("#dcd0ff")
+
 @export var body_color: Color = Color("#6ec6ff")
 @export var player_controlled: bool = false
 
@@ -83,6 +85,31 @@ func _draw() -> void:
 		draw_arc(Vector2.ZERO, RADIUS + 13.0, 0.0, TAU, 32, Color("#7ee081"), 2.0, true)
 
 	_draw_health_bar()
+	_draw_mantra()
+
+
+## The spoken words, overhead, for as long as the cast runs. This is the opponent's
+## read on what is coming — and what a fizzle-feint fakes.
+func _draw_mantra() -> void:
+	var state := combatant.entity_state
+	if state.current_state != EntityState.State.CASTING:
+		return
+
+	var font := ThemeDB.fallback_font
+	var font_size := 16
+	var text: String = state.current_spell.mantra
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var origin := Vector2(-width * 0.5, -RADIUS - 30.0)
+
+	# Dark outline first so the words stay readable over the arena floor.
+	for offset in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
+		draw_string(
+			font, origin + offset, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
+			Color("#0d1017")
+		)
+	draw_string(
+		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, MANTRA_COLOR
+	)
 
 
 func _draw_health_bar() -> void:

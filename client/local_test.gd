@@ -17,6 +17,15 @@ const SPELL_KEYS := {
 }
 
 const DUMMY_THINK_SECONDS: float = 0.9
+const EFFECT_SECONDS: float = 0.55
+
+const SPELL_COLORS := {
+	"Magic Arrow": Color("#9fd8ff"),
+	"Poison": Color("#7ee081"),
+	"Lightning": Color("#fff2a8"),
+	"Flamestrike": Color("#ff8a4c"),
+	"Paralyze": Color("#ffd166"),
+}
 
 var map: ArenaMap
 var resolver: CombatResolver
@@ -27,6 +36,10 @@ var hud: Label
 
 var _dummy_think_timer: float = 0.0
 var _last_event: String = ""
+
+## Brief bolt-and-flash for spells that connected. Blocked spells show nothing at all,
+## matching UO, where a spell you have no line to simply never goes off.
+var _effects: Array[Dictionary] = []
 
 ## Drawn above the arena floor — this node draws itself before its children, so the
 ## sight line has to live on a layer of its own or the floor paints over it.
@@ -101,12 +114,26 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 	_last_event = "%s cast %s — %s" % [
 		who, spell.spell_name, "hit" if connected else "blocked by cover"
 	]
+	if connected:
+		_effects.append({
+			"from": from.position,
+			"to": to.position,
+			"color": SPELL_COLORS.get(spell.spell_name, Color.WHITE) as Color,
+			"remaining": EFFECT_SECONDS,
+		})
 
 
 func _process(delta: float) -> void:
 	_run_dummy(delta)
+	_age_effects(delta)
 	_update_hud()
 	_sight_line.queue_redraw()
+
+
+func _age_effects(delta: float) -> void:
+	for effect in _effects:
+		effect["remaining"] -= delta
+	_effects = _effects.filter(func(e: Dictionary) -> bool: return e["remaining"] > 0.0)
 
 
 func _run_dummy(delta: float) -> void:
@@ -192,6 +219,22 @@ func _draw_sight_line() -> void:
 		Color("#7ee081", 0.55) if clear else Color("#e2574c", 0.30),
 		2.0
 	)
+
+	for effect in _effects:
+		var fade: float = effect["remaining"] / EFFECT_SECONDS
+		var color: Color = effect["color"]
+		var from: Vector2 = effect["from"]
+		var to: Vector2 = effect["to"]
+
+		# Bolt: a wide soft trail with a bright core, so it reads even when it lies
+		# along the sight line.
+		_sight_line.draw_line(from, to, Color(color, fade * 0.35), 10.0)
+		_sight_line.draw_line(from, to, Color(color, fade), 3.0)
+
+		# Impact: an expanding ring plus a solid core that fades faster.
+		var radius := 14.0 + (1.0 - fade) * 26.0
+		_sight_line.draw_arc(to, radius, 0.0, TAU, 28, Color(color, fade), 3.0, true)
+		_sight_line.draw_circle(to, radius * 0.55, Color(color, fade * fade * 0.8))
 
 	# Where you are steering, while the move button is down.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
