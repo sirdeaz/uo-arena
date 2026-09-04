@@ -51,6 +51,20 @@ The chain is a feint tool, not just a punishment — a stream of cast-starts tha
 resolve baits an opponent into breaking line of sight or committing early. It also
 means spam-casting lands nothing at all.
 
+## Arena
+
+`server/arena_map.tscn` is 1200×800 with spawns at `(±500, 0)` — about 5.5s apart at
+`PLAYER_MOVE_SPEED`. Four cover pieces, placed with 180° rotational symmetry so neither
+spawn is favoured: two tents flanking a clear centre lane, two rocks in opposite
+corners. The duel opens with a shot available straight down the lane; stepping off it
+puts a tent in the way immediately.
+
+The scene holds collision bodies only — no sprites — so the client can draw its own view
+and `server/` stays exportable as a Dedicated Server build. Open it in the editor to drag
+cover around; `tests/test_arena_map.gd` will tell you if a change breaks the layout, since
+it asserts cover is reachable within two seconds of movement and that both spawns get an
+equal amount of it.
+
 ## Tests
 
 ```bash
@@ -78,7 +92,7 @@ placeholders and still need balancing.
 ## Build order
 
 1. ~~`server/combat_resolver.gd` — line-of-sight raycast + hit resolution~~ ✅
-2. `server/arena_map.tscn` — Minoc tents map with real cover (can overlap with 1)
+2. ~~`server/arena_map.tscn` — Minoc tents map with real cover~~ ✅
 3. `autoload/network_manager.gd` — ENet multiplayer wiring, 2 players
 4. `client/cast_bar_ui.gd` — casting feedback driven purely by `EntityState` signals
 5. `server/match_manager.gd` — round start/win/reset

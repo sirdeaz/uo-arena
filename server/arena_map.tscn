@@ -1,0 +1,94 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://server/arena_map.gd" id="1_arena_map"]
+
+[sub_resource type="RectangleShape2D" id="TentShape"]
+size = Vector2(200, 110)
+
+[sub_resource type="RectangleShape2D" id="RockShape"]
+size = Vector2(130, 130)
+
+[sub_resource type="RectangleShape2D" id="WallHorizontal"]
+size = Vector2(1240, 40)
+
+[sub_resource type="RectangleShape2D" id="WallVertical"]
+size = Vector2(40, 840)
+
+[node name="ArenaMap" type="Node2D"]
+script = ExtResource("1_arena_map")
+
+[node name="Cover" type="Node2D" parent="."]
+
+[node name="TentNorth" type="StaticBody2D" parent="Cover"]
+position = Vector2(0, -140)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cover/TentNorth"]
+shape = SubResource("TentShape")
+
+[node name="TentSouth" type="StaticBody2D" parent="Cover"]
+position = Vector2(0, 140)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cover/TentSouth"]
+shape = SubResource("TentShape")
+
+[node name="RockSouthWest" type="StaticBody2D" parent="Cover"]
+position = Vector2(-280, 240)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cover/RockSouthWest"]
+shape = SubResource("RockShape")
+
+[node name="RockNorthEast" type="StaticBody2D" parent="Cover"]
+position = Vector2(280, -240)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cover/RockNorthEast"]
+shape = SubResource("RockShape")
+
+[node name="Bounds" type="Node2D" parent="."]
+
+[node name="WallNorth" type="StaticBody2D" parent="Bounds"]
+position = Vector2(0, -420)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bounds/WallNorth"]
+shape = SubResource("WallHorizontal")
+
+[node name="WallSouth" type="StaticBody2D" parent="Bounds"]
+position = Vector2(0, 420)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bounds/WallSouth"]
+shape = SubResource("WallHorizontal")
+
+[node name="WallWest" type="StaticBody2D" parent="Bounds"]
+position = Vector2(-620, 0)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bounds/WallWest"]
+shape = SubResource("WallVertical")
+
+[node name="WallEast" type="StaticBody2D" parent="Bounds"]
+position = Vector2(620, 0)
+collision_layer = 2
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Bounds/WallEast"]
+shape = SubResource("WallVertical")
+
+[node name="SpawnPoints" type="Node2D" parent="."]
+
+[node name="Spawn1" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(-500, 0)
+
+[node name="Spawn2" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(500, 0)
