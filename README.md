@@ -4,6 +4,19 @@ Classic Ultima Online magery PvP as a small arena game: cast-while-moving, fixed
 times, fizzle on recast-too-soon, interrupt-on-hit, and line-of-sight dodging behind
 cover. Godot 4, GDScript. 1v1 first, team modes later.
 
+> **Early prototype.** Single-player against a practice dummy — there is no multiplayer
+> yet. It exists to prove the feel is achievable, not to be a game.
+
+## Just want to try it?
+
+**[Download the latest Windows build](../../releases/latest)** — no GitHub account
+needed. Unzip, double-click `UOArena.exe`, and read `READ ME FIRST.txt`. It's unsigned,
+so Windows will show a "more info → run anyway" prompt.
+
+Hold **right mouse** to walk toward the cursor, **1**–**5** to cast, **R** to reset.
+Watch the words above a caster's head: `Kal Vas Flam` means a flamestrike is 2.5 seconds
+away and you should get behind a tent.
+
 ## Requirements
 
 - Godot 4.x (installed here via `winget install GodotEngine.GodotEngine`)
