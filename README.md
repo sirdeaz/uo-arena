@@ -35,6 +35,22 @@ Run as server locally:
 godot --headless -- --server
 ```
 
+## Cast model
+
+`EntityState` is `IDLE → CASTING → RECOVERING`, with `INTERRUPTED` as a momentary
+signal state that clears the next frame.
+
+- **Recast inside the fizzle window** (first 0.25s of a cast): the *in-progress* spell
+  fizzles, you pay `GLOBAL_CAST_RECOVERY_SECONDS` of recovery, and then the spell you
+  chained into starts. Nothing is castable during recovery.
+- **Recast after the window:** denied outright. There is no cast queueing.
+- **Any damage interrupts**, including poison ticks. Paralyze interrupts too despite
+  dealing no damage, because it connects.
+
+The chain is a feint tool, not just a punishment — a stream of cast-starts that never
+resolve baits an opponent into breaking line of sight or committing early. It also
+means spam-casting lands nothing at all.
+
 ## Tests
 
 ```bash
