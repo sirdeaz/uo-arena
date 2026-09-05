@@ -23,10 +23,15 @@ if (-not $godot -or -not (Test-Path $godot)) {
     exit 1
 }
 
+$extra = @()
+if ($Port) { $extra += @("--port", "$Port") }
+
 if ($Editor) {
     & $godot --editor
 } elseif ($Server) {
-    & $godot --headless -- --server
+    & $godot --headless -- --server @extra
+} elseif ($Connect) {
+    & $godot -- --connect $Connect @extra
 } else {
-    & $godot
+    & $godot -- @extra
 }

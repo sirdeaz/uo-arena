@@ -185,3 +185,53 @@ func test_the_client_holds_no_colour_literals_of_its_own() -> void:
 			source.contains('Color("#'),
 			"%s writes a hex colour of its own instead of using Palette" % file_name
 		)
+
+
+## Ten opponents have to be told apart without stealing a hue that already means
+## something. The ramp answers that by saying one thing — "not you" — ten ways, so what
+## is pinned here is the family, not ten separate meanings.
+func test_every_opponent_slot_looks_different() -> void:
+	var seen: Array[Color] = []
+	for slot in Palette.OPPONENT_VARIANTS:
+		var color := Palette.opponent_body(slot)
+		for other in seen:
+			assert_true(
+				_distance(color, other) > 0.0, "slot %d repeats an earlier body" % slot
+			)
+		seen.append(color)
+
+
+func test_no_opponent_can_be_mistaken_for_you() -> void:
+	# The first read of a fight is "is that me". It has to be free.
+	for slot in Palette.OPPONENT_VARIANTS:
+		assert_true(
+			_distance(Palette.opponent_body(slot), Palette.PLAYER) >= MIN_SEPARATION,
+			"slot %d is too close to the player's own blue" % slot
+		)
+
+
+func test_opponents_stay_out_of_the_colours_that_carry_meaning() -> void:
+	# A body in poison green or paralyze yellow would put a permanent status read on
+	# someone who has no status at all.
+	const SPOKEN_FOR := {
+		"poisoned": Palette.STATUS_POISONED,
+		"paralyzed": Palette.STATUS_PARALYZED,
+		"interrupted": Palette.CAST_INTERRUPTED,
+		"succeeded": Palette.CAST_SUCCEEDED,
+		"hurt": Palette.HEALTH_HURT,
+	}
+	for slot in Palette.OPPONENT_VARIANTS:
+		var color := Palette.opponent_body(slot)
+		for meaning in SPOKEN_FOR:
+			assert_true(
+				_distance(color, SPOKEN_FOR[meaning]) >= MIN_SEPARATION,
+				"slot %d is within a glance of '%s'" % [slot, meaning]
+			)
+
+
+func test_slots_past_the_ramp_wrap_rather_than_fail() -> void:
+	assert_eq(
+		Palette.opponent_body(Palette.OPPONENT_VARIANTS),
+		Palette.opponent_body(0),
+		"an eleventh slot should reuse a body, not produce a broken colour"
+	)

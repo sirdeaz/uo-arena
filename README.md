@@ -4,8 +4,9 @@ Classic Ultima Online magery PvP as a small arena game: cast-while-moving, fixed
 times, fizzle on recast-too-soon, interrupt-on-hit, and line-of-sight dodging behind
 cover. Godot 4, GDScript. 1v1 first, team modes later.
 
-> **Early prototype.** Single-player against a practice dummy — there is no multiplayer
-> yet. It exists to prove the feel is achievable, not to be a game.
+> **Early prototype.** Ten-player multiplayer works over a local network; there are no
+> rounds, no scoring and no matchmaking yet. It exists to prove the feel is achievable,
+> not to be a game.
 
 ## ▶ Play it in your browser
 
@@ -17,6 +18,11 @@ latest version — every push to `main` republishes it automatically.
 Hold **right mouse** to walk toward the cursor, **1**–**5** to cast, **R** to reset.
 Watch the words above a caster's head: `Kal Vas Flam` means a flamestrike is 2.5 seconds
 away and you should get behind a tent.
+
+The browser version is **offline practice against a dummy**. Godot's HTML5 export has no
+ENet, so a page cannot join a server — multiplayer needs a native build. (The transport
+is isolated behind two functions in `network_manager.gd`; moving to WebSockets, which
+browsers *can* speak, is a change to those two and nothing else.)
 
 Prefer a native build? **[Download the Windows version](../../releases/latest)** — unzip,
 double-click `UOArena.exe`. It's unsigned, so Windows shows a "more info → run anyway"
@@ -50,11 +56,47 @@ solid line versus a dashed one rather than a third claim on those two.
 `dedicated_server` feature or is launched with `--server`, and to `client/client_main.tscn`
 otherwise.
 
-Run as server locally:
+## Multiplayer
+
+Up to ten players, one authoritative server, ENet. Start a server and point clients at it:
 
 ```bash
-godot --headless -- --server
+powershell -File run_game.ps1 -Server
 ```
+
+```bash
+powershell -File run_game.ps1 -Connect 127.0.0.1
+```
+
+Without `-Connect` a client opens a join screen with an address box and an **Offline
+practice** button. `-Port` moves all of it off the default 24567.
+
+**The server decides everything.** It owns positions, health, status timers and every
+cast state machine, and broadcasts the world 20 times a second. Clients draw what they
+are told. The three ways a cast can end — completed, fizzled, interrupted — are announced
+as their own events rather than sampled, because a snapshot cannot tell a fizzle from an
+interrupt, and `INTERRUPTED` clears itself within a frame.
+
+**Your own movement is predicted.** The client keeps running `move_and_slide` on your
+input so steering stays instant, and is pulled back toward the server's version when the
+two drift more than 28 px apart. A gap over 120 px is a respawn rather than an error, and
+snaps. Waiting a round trip to start walking would be felt on every dodge, which in a
+game about stepping behind a tent mid-cast is the whole thing.
+
+**Nothing trusts the client.** No request carries a "who I am" field — the caster is
+always the transport's own sender id, so there is no field to forge. Steering is clamped
+to unit length (an unclamped direction is a fifty-times-move-speed hack in one line),
+cast requests are rate-limited and re-validated against the roster, and line of sight is
+checked when a cast starts and again when it lands. Peer relaying is turned off, so
+clients cannot talk to each other at all.
+
+**Targeting** is sticky: left-click a player to select them, then `1`–`5` casts at them.
+The aim is committed when a cast actually *begins*, not when you press the key — a
+recast fizzles what was running and the chained spell starts later, and it flies at
+whoever you named with it.
+
+**Dying** costs you four seconds, then you reappear at the spawn furthest from everyone
+still standing. There are no rounds yet; `server/match_manager.gd` is the next step.
 
 ## Cast model
 
@@ -107,15 +149,18 @@ header of `build.ps1`.
 powershell -File run_game.ps1
 ```
 
-(`-Editor` opens the Godot editor instead, `-Server` runs headless as a dedicated
-server.) The client boots straight into `client/scenes/local_test.tscn` — a local,
-network-free harness against a dummy that casts magic arrow at you on a loop.
+(`-Editor` opens the Godot editor, `-Server` runs headless as a dedicated server, and
+`-Connect <addr>` joins one directly.) With no flags the client opens a join screen;
+**Offline practice** boots `client/scenes/local_test.tscn` — a local, network-free
+harness against a dummy that casts magic arrow at you on a loop. It is the quickest way
+to feel a change, and it needs no server.
 
 | Input | |
 | --- | --- |
 | hold right mouse | walk toward the cursor, UO-style — works freely while casting |
 | `1`–`5` | magic arrow, poison, lightning, flamestrike, paralyze |
-| `R` | reset the round |
+| left click | pick your target (multiplayer only) |
+| `R` | reset the round (offline practice only) |
 | `WASD` | keyboard fallback, kept for testing |
 
 The line between you and the dummy is the actual raycast the resolver uses — solid when
@@ -140,17 +185,22 @@ draw nothing at all — in UO a spell with no line simply never goes off.
 
 ## Arena
 
-`server/arena_map.tscn` is 1200×800 with spawns at `(±500, 0)` — about 5.5s apart at
-`PLAYER_MOVE_SPEED`. Four cover pieces, placed with 180° rotational symmetry so neither
-spawn is favoured: two tents flanking a clear centre lane, two rocks in opposite
+`server/arena_map.tscn` is 1200×800 with ten spawns, placed in 180° rotationally
+symmetric pairs so no starting position is the good one. The first two are the duel lane
+at `(±500, 0)` — about 4.5s apart at `PLAYER_MOVE_SPEED` — and joining players are given
+spawns in that order, so the first two into a fresh server get the opening the map was
+drawn around. Respawns work the other way, picking the marker furthest from everyone
+still standing.
+
+Four cover pieces: two tents flanking the clear centre lane, two rocks in opposite
 corners. The duel opens with a shot available straight down the lane; stepping off it
 puts a tent in the way immediately.
 
 The scene holds collision bodies only — no sprites — so the client can draw its own view
 and `server/` stays exportable as a Dedicated Server build. Open it in the editor to drag
 cover around; `tests/test_arena_map.gd` will tell you if a change breaks the layout, since
-it asserts cover is reachable within two seconds of movement and that both spawns get an
-equal amount of it.
+it asserts cover is reachable within two seconds of movement from *every* spawn, that
+each one has a rotational partner, and that none of them puts you inside a tent.
 
 ## Tests
 
@@ -181,10 +231,12 @@ still need balancing.
 
 1. ~~`server/combat_resolver.gd` — line-of-sight raycast + hit resolution~~ ✅
 2. ~~`server/arena_map.tscn` — Minoc tents map with real cover~~ ✅
-3. `autoload/network_manager.gd` — ENet multiplayer wiring, 2 players
-4. `client/cast_bar_ui.gd` — casting feedback driven purely by `EntityState` signals
+3. ~~`autoload/network_manager.gd` — ENet multiplayer wiring, up to 10 players~~ ✅
+4. ~~`client/cast_bar_ui.gd` — casting feedback driven purely by `EntityState` signals~~ ✅
 5. `server/match_manager.gd` — round start/win/reset
 
 Rule of thumb: get hit resolution and cover-dodging feeling right in local single-player
 before any networking goes in. Keep `server/` free of `Node2D` rendering code so the
-Dedicated Server export stays clean.
+Dedicated Server export stays clean — `server/player_body.gd` is the one exception, and
+it earns it: the server has to slide along cover with the very same `move_and_slide` the
+client predicts with, or hugging a tent would produce a correction on every frame.

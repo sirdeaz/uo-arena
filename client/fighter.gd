@@ -2,10 +2,18 @@ extends CharacterBody2D
 class_name Fighter
 
 ## Client-side body for a combatant: physics, input, and a placeholder drawn shape.
-## Owns a `Combatant` (the authoritative rules object) and keeps its position in sync.
-## When networking lands this becomes the client's predicted view of a server entity.
+##
+## It owns a `Combatant` in all three of its configurations, and what changes between
+## them is only who advances that combatant's clock and who owns its position:
+##
+##   offline practice   `server_driven` false — it runs the real rules itself, as it
+##                      always has, and its own position is the truth.
+##   networked, yours   both flags — steers on your input for feel, and is corrected
+##                      toward whatever the server says.
+##   networked, theirs  `server_driven` only — no input to read, so it simply coasts
+##                      to wherever the last snapshot put it.
 
-const RADIUS: float = 18.0
+const RADIUS: float = Constants.PLAYER_RADIUS
 const HEALTH_BAR_WIDTH: float = 52.0
 
 ## Cursor distance below which holding the move button does nothing. Without it a
@@ -18,8 +26,31 @@ const MANTRA_COLOR := Palette.MANTRA
 const BURST_SECONDS: float = 0.4
 const RUNE_COUNT: int = 3
 
+## How hard to pull a predicted body back toward the server's version of it. A player
+## keeps running `move_and_slide` on their own input so steering stays instant, and this
+## is what quietly reconciles the guess.
+##
+## At 225 px/s a player legitimately travels 11 px between snapshots, and the round trip
+## adds more, so correcting under this would mean nagging at honest lag.
+const CORRECTION_THRESHOLD: float = 28.0
+
+## Past this we are not correcting, we are teleporting — a respawn, or a desync worth
+## admitting to. Snap, rather than sliding the body across the arena.
+const TELEPORT_THRESHOLD: float = 120.0
+
+const CORRECTION_RATE: float = 8.0
+const REMOTE_RATE: float = 18.0
+
 @export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
+
+## True when this body is a view of a combatant the server owns. It then advances no
+## timers of its own — health, status and cast state are written from snapshots — and
+## only the display timers move locally, so the cast bar doesn't step at snapshot rate.
+@export var server_driven: bool = false
+
+## Where the server last said this fighter is. Ignored while `server_driven` is false.
+var server_position: Vector2 = Vector2.ZERO
 
 var combatant: Combatant
 
@@ -73,19 +104,58 @@ func _burst(color: Color, expands: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	combatant.tick_status(delta)
+	if server_driven:
+		# Only the visible timers. Running the real step here would tick poison locally,
+		# inventing damage the server never dealt and interrupt bursts nobody caused.
+		combatant.entity_state.advance_display_only(delta)
+	else:
+		combatant.tick(delta)
+
 	_anim_time += delta
 	_burst_remaining = maxf(0.0, _burst_remaining - delta)
 
+	# Prediction: a server-driven local player still steers itself, because waiting a
+	# round trip to start moving would be felt on every dodge. Remote fighters have no
+	# input to read, so they simply coast to wherever the last snapshot put them.
 	var direction := Vector2.ZERO
 	if player_controlled and combatant.can_move():
-		direction = _input_direction()
+		direction = input_direction()
 	velocity = direction * Constants.PLAYER_MOVE_SPEED
 	move_and_slide()
 
-	combatant.position = global_position
+	if server_driven:
+		_apply_server_correction(delta)
+	else:
+		combatant.position = global_position
+
 	queue_redraw()
 	_fx.queue_redraw()
+
+
+## Pulls this body toward the server's version of where it is. Exponential rather than a
+## raw lerp on delta, so the pull feels the same at any frame rate.
+##
+## Paralyze and death need nothing special here: both arrive through the snapshot into
+## `can_move()`, so prediction stops on its own about a round trip late, and the
+## overshoot that costs is roughly the size of the correction threshold — which is why
+## the correction is a lerp rather than a snap.
+func _apply_server_correction(delta: float) -> void:
+	var error := global_position.distance_to(server_position)
+
+	if error > TELEPORT_THRESHOLD:
+		global_position = server_position
+	elif not player_controlled:
+		# Nobody is predicting this one, so track tightly. The smoothing is here only to
+		# hide the step between snapshots.
+		global_position = global_position.lerp(
+			server_position, 1.0 - exp(-delta * REMOTE_RATE)
+		)
+	elif error > CORRECTION_THRESHOLD:
+		global_position = global_position.lerp(
+			server_position, 1.0 - exp(-delta * CORRECTION_RATE)
+		)
+
+	combatant.position = global_position
 
 
 ## Direction to steer in when the cursor is at `target`, or zero inside the dead zone.
@@ -96,7 +166,10 @@ static func movement_direction_toward(from: Vector2, target: Vector2) -> Vector2
 	return offset.normalized()
 
 
-func _input_direction() -> Vector2:
+## The steering this player is asking for, before any rule is applied to it. Public
+## because a networked client has to send the server the very same direction it is
+## predicting with locally — if the two disagreed, every step would need correcting.
+func input_direction() -> Vector2:
 	# UO steering: hold the right mouse button and walk toward the cursor.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		return movement_direction_toward(global_position, get_global_mouse_position())

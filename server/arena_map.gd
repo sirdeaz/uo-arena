@@ -13,6 +13,13 @@ const HALF_WIDTH: float = 600.0
 const HALF_HEIGHT: float = 400.0
 
 
+## Every spawn, in scene order. Two things about that order are load-bearing, so if you
+## drag markers about in the editor, keep them:
+##
+## The first two are the duel lane — the original 1v1 pair at (±500, 0), which several
+## tests still use as "the opening shot". And the set as a whole is 180° rotationally
+## symmetric: for every spawn `p` there is a spawn at `-p`, which is what stops any one
+## starting position from being the good one.
 func get_spawn_positions() -> Array[Vector2]:
 	var positions: Array[Vector2] = []
 	for marker in $SpawnPoints.get_children():

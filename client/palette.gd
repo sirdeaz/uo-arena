@@ -57,6 +57,35 @@ const DUMMY := Color("#e07ea8")
 ## The spoken mantra overhead — the opponent's read on what is coming.
 const MANTRA := Color("#dcd0ff")
 
+## How many opponents `opponent_body` can tell apart before it starts repeating.
+const OPPONENT_VARIANTS: int = 10
+
+## How far either side of the rose the ramp swings, and how much lightness it trades
+## across that swing. Neighbours differ on two channels rather than one, which is what
+## makes ten of them separable inside a single hue family.
+const OPPONENT_HUE_SPREAD: float = 0.15
+const OPPONENT_VALUE_SPREAD: float = 0.42
+
+
+## An opponent's body, for a `slot` the server handed out.
+##
+## Derived from `DUMMY` rather than listed as ten named constants, and that is the whole
+## point. Ten flat hues would have to come from somewhere, and there is nowhere left to
+## take them from: green is poison, orange is interrupted, yellow is paralyzed, teal is
+## a released cast, red is dying. Spending those on "which player is that" would cost a
+## read that actually decides fights.
+##
+## So the ramp says one thing — *not you* — ten slightly different ways. You are always
+## `PLAYER` blue on your own screen, so the first read, the one that matters at speed,
+## is a single glance at hue family; telling two opponents apart is the slower second
+## read, and a lightness step is enough for it.
+static func opponent_body(slot: int) -> Color:
+	var t := float(posmod(slot, OPPONENT_VARIANTS)) / float(OPPONENT_VARIANTS - 1)
+	var color := DUMMY
+	color.h = fposmod(color.h + (t - 0.5) * OPPONENT_HUE_SPREAD, 1.0)
+	color.v = clampf(color.v - (t - 0.5) * OPPONENT_VALUE_SPREAD, 0.3, 1.0)
+	return color
+
 
 # ── Cast feedback ─────────────────────────────────────────────────────────────────
 # How a cast ended, on the cast bar and as the burst around the caster. The two always

@@ -92,3 +92,27 @@ position = Vector2(-500, 0)
 
 [node name="Spawn2" type="Marker2D" parent="SpawnPoints"]
 position = Vector2(500, 0)
+
+[node name="Spawn3" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(-500, 280)
+
+[node name="Spawn4" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(500, -280)
+
+[node name="Spawn5" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(-500, -280)
+
+[node name="Spawn6" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(500, 280)
+
+[node name="Spawn7" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(-150, 340)
+
+[node name="Spawn8" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(150, -340)
+
+[node name="Spawn9" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(-150, -340)
+
+[node name="Spawn10" type="Marker2D" parent="SpawnPoints"]
+position = Vector2(150, 340)
