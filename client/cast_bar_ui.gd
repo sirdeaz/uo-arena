@@ -6,11 +6,14 @@ class_name CastBarUI
 
 const FLASH_SECONDS: float = 0.45
 
-const CASTING_COLOR := Color("#6ec6ff")
-const RECOVERY_COLOR := Color("#8a7a5c")
-const COMPLETE_COLOR := Color("#7ee081")
-const FIZZLE_COLOR := Color("#e2574c")
-const INTERRUPT_COLOR := Color("#ffa447")
+## The bar you are filling is your own cast, so it wears your colour. The three
+## outcomes below are the separate axis: what happened when it ended.
+const CASTING_COLOR := Palette.PLAYER
+
+const COMPLETE_COLOR := Palette.CAST_SUCCEEDED
+const FIZZLE_COLOR := Palette.CAST_FIZZLED
+const INTERRUPT_COLOR := Palette.CAST_INTERRUPTED
+const RECOVERY_COLOR := Palette.CAST_RECOVERING
 
 var _state: EntityState
 var _flash_color := Color.TRANSPARENT
@@ -89,10 +92,10 @@ func _flash_alpha() -> float:
 
 
 func _draw_bar(track: Rect2, fraction: float, color: Color) -> void:
-	draw_rect(track, Color("#11141c"))
+	draw_rect(track, Palette.UI_PANEL)
 	var filled := Rect2(track.position, Vector2(track.size.x * clampf(fraction, 0.0, 1.0), track.size.y))
 	draw_rect(filled, color)
-	draw_rect(track, Color("#3a4050"), false, 1.0)
+	draw_rect(track, Palette.UI_BORDER, false, 1.0)
 
 
 func _draw_caption(font: Font, font_size: int, text: String, color: Color) -> void:
