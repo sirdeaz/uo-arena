@@ -12,13 +12,13 @@ const HEALTH_BAR_WIDTH: float = 52.0
 ## cursor resting on your own feet flips direction every frame and you vibrate.
 const MOUSE_DEAD_ZONE: float = 16.0
 
-const MANTRA_COLOR := Color("#dcd0ff")
+const MANTRA_COLOR := Palette.MANTRA
 
 ## How long the release / fizzle / interrupt burst stays on screen.
 const BURST_SECONDS: float = 0.4
 const RUNE_COUNT: int = 3
 
-@export var body_color: Color = Color("#6ec6ff")
+@export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
 
 var combatant: Combatant
@@ -59,10 +59,10 @@ func _ready() -> void:
 		func(spell: SpellData) -> void: _burst(SpellVisuals.color_for(spell), true)
 	)
 	state.cast_fizzled.connect(
-		func(_spell: SpellData, _reason: String) -> void: _burst(Color("#8a8f9c"), false)
+		func(_spell: SpellData, _reason: String) -> void: _burst(Palette.CAST_FIZZLED, false)
 	)
 	state.cast_interrupted.connect(
-		func(_spell: SpellData) -> void: _burst(Color("#ffa447"), false)
+		func(_spell: SpellData) -> void: _burst(Palette.CAST_INTERRUPTED, false)
 	)
 
 
@@ -119,9 +119,13 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 32, body_color.darkened(0.4), 2.0, true)
 
 	if combatant.is_paralyzed():
-		draw_arc(Vector2.ZERO, RADIUS + 7.0, 0.0, TAU, 32, Color("#ffd166"), 3.0, true)
+		draw_arc(
+			Vector2.ZERO, RADIUS + 7.0, 0.0, TAU, 32, Palette.STATUS_PARALYZED, 3.0, true
+		)
 	if combatant.poison_seconds_remaining > 0.0:
-		draw_arc(Vector2.ZERO, RADIUS + 13.0, 0.0, TAU, 32, Color("#7ee081"), 2.0, true)
+		draw_arc(
+			Vector2.ZERO, RADIUS + 13.0, 0.0, TAU, 32, Palette.STATUS_POISONED, 2.0, true
+		)
 
 	_draw_health_bar()
 	_draw_mantra()
@@ -141,7 +145,7 @@ func _draw_cast_animation() -> void:
 	if state.current_state == EntityState.State.RECOVERING:
 		var left := 1.0 - state.recovery_time_elapsed / Constants.GLOBAL_CAST_RECOVERY_SECONDS
 		var embers := SpellFX.ring_path(RADIUS + 12.0, 20, 5.0, SpellFX.crackle_seed(_anim_time))
-		SpellFX.draw_glow_line(_fx, embers, Color("#8a8f9c"), 0.35 * left, 0.6, true)
+		SpellFX.draw_glow_line(_fx, embers, Palette.CAST_RECOVERING, 0.35 * left, 0.6, true)
 		return
 
 	if state.current_state != EntityState.State.CASTING:
@@ -212,7 +216,7 @@ func _draw_mantra() -> void:
 	for offset in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
 		draw_string(
 			font, origin + offset, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
-			Color("#0d1017")
+			Palette.OUTLINE
 		)
 	draw_string(
 		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, MANTRA_COLOR
@@ -222,11 +226,12 @@ func _draw_mantra() -> void:
 func _draw_health_bar() -> void:
 	var fraction := clampf(combatant.health / Constants.PLAYER_MAX_HEALTH, 0.0, 1.0)
 	var origin := Vector2(-HEALTH_BAR_WIDTH * 0.5, -RADIUS - 18.0)
-	draw_rect(Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Color("#2b2f3a"))
+	draw_rect(Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.BAR_TRACK)
 	draw_rect(
 		Rect2(origin, Vector2(HEALTH_BAR_WIDTH * fraction, 6.0)),
-		Color("#e2574c") if fraction < 0.35 else Color("#7ee081")
+		Palette.HEALTH_HURT if fraction < Palette.HEALTH_HURT_FRACTION \
+			else Palette.HEALTH_HEALTHY
 	)
 	draw_rect(
-		Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Color("#0d1017"), false, 1.0
+		Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.OUTLINE, false, 1.0
 	)

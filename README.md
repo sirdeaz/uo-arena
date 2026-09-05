@@ -40,6 +40,12 @@ client/      input, rendering, prediction/interpolation, UI
 autoload/    network_manager.gd picks client vs server role at boot
 ```
 
+`client/palette.gd` holds every colour in the game. They are all `_draw()` arguments —
+there are no textures, sprites or shaders — so the palette is the art. It is grouped by
+role rather than by hue to keep one meaning per colour: green is poison and nothing
+else, red means you are nearly dead and nothing else, and whether you have a shot is a
+solid line versus a dashed one rather than a third claim on those two.
+
 `autoload/network_manager.gd` routes to `server/server_main.tscn` when the build has the
 `dedicated_server` feature or is launched with `--server`, and to `client/client_main.tscn`
 otherwise.
@@ -112,8 +118,8 @@ network-free harness against a dummy that casts magic arrow at you on a loop.
 | `R` | reset the round |
 | `WASD` | keyboard fallback, kept for testing |
 
-The line between you and the dummy is the actual raycast the resolver uses — green when
-it has a shot, red when cover is breaking it. Stand in the open and the dummy will
+The line between you and the dummy is the actual raycast the resolver uses — solid when
+it has a shot, dashed when cover is breaking it. Stand in the open and the dummy will
 interrupt whatever you're casting; step behind a tent and its casts fail silently.
 
 **Watch the words.** A caster speaks the spell's mantra overhead for the whole cast —

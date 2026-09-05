@@ -4,10 +4,10 @@ class_name ArenaView
 ## Draws the arena straight from its collision shapes, so what you see is exactly what
 ## the raycast hits. No art assets, no second source of truth to drift out of sync.
 
-const FLOOR_COLOR := Color("#1b1f2a")
-const COVER_COLOR := Color("#4a4234")
-const COVER_EDGE := Color("#8a7a5c")
-const WALL_COLOR := Color("#2b2f3a")
+const FLOOR_COLOR := Palette.FLOOR
+const COVER_COLOR := Palette.COVER_FILL
+const COVER_EDGE := Palette.COVER_EDGE
+const WALL_COLOR := Palette.WALL
 
 var map: ArenaMap
 
