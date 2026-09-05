@@ -3,10 +3,16 @@ name: Test and publish the playable build
 # Every push to main runs the test suite and, if it passes, republishes the browser
 # build to GitHub Pages. That is the whole sharing loop: one permanent URL that is
 # always the latest version, and nothing for a player to download or install.
+#
+# Pull requests run everything except the publishing, so a change to this file is
+# exercised before it is merged rather than after.
 
 on:
   push:
     branches: [main]
+  # Pull requests run the tests and the export, but never publish. Without this the
+  # first time anything here is exercised is after it has already been merged.
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -15,7 +21,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  # Per-ref, so a pull request build cannot cancel the deploy of a push to main.
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -97,12 +104,14 @@ jobs:
         run: touch build/web/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: build/web
 
   deploy:
     name: Publish to Pages
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
