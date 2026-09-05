@@ -13,6 +13,12 @@ const HEALTH_BAR_WIDTH: float = 52.0
 const MOUSE_DEAD_ZONE: float = 16.0
 
 const MANTRA_COLOR := Color("#dcd0ff")
+const MANTRA_OUTLINE_COLOR := Color("#0d1017")
+const MANTRA_FONT_SIZE: int = 16
+
+## Thickness of the dark halo behind the mantra. The words are read against the arena
+## floor at a glance, mid-fight, so they get an outline rather than relying on contrast.
+const MANTRA_OUTLINE_SIZE: int = 3
 
 ## How long the release / fizzle / interrupt burst stays on screen.
 const BURST_SECONDS: float = 0.4
@@ -183,20 +189,19 @@ func _draw_mantra() -> void:
 	if state.current_state != EntityState.State.CASTING:
 		return
 
-	var font := ThemeDB.fallback_font
-	var font_size := 16
+	var font := SpellVisuals.MANTRA_FONT
 	var text: String = state.current_spell.mantra
-	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE).x
 	var origin := Vector2(-width * 0.5, -RADIUS - 30.0)
 
-	# Dark outline first so the words stay readable over the arena floor.
-	for offset in [Vector2(1, 0), Vector2(-1, 0), Vector2(0, 1), Vector2(0, -1)]:
-		draw_string(
-			font, origin + offset, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
-			Color("#0d1017")
-		)
+	# Dark outline so the words stay readable over the arena floor. One call rather than
+	# the four offset passes this used to take.
+	draw_string_outline(
+		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE,
+		MANTRA_OUTLINE_SIZE, MANTRA_OUTLINE_COLOR
+	)
 	draw_string(
-		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, MANTRA_COLOR
+		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE, MANTRA_COLOR
 	)
 
 
