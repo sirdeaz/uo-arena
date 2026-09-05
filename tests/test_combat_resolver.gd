@@ -81,6 +81,88 @@ func test_paralyze_deals_no_direct_damage() -> void:
 	assert_almost_eq(target.health, before, "paralyze is control, not damage")
 
 
+# ── starting a cast needs a target you can see ────────────────────────────────
+
+func test_a_cast_can_begin_with_a_clear_shot() -> void:
+	await get_tree().physics_frame
+	assert_true(
+		resolver.try_begin_cast(caster, target, _spell("flamestrike")),
+		"a visible target should be castable at"
+	)
+	assert_eq(
+		caster.entity_state.current_state,
+		EntityState.State.CASTING,
+		"and the cast should actually start"
+	)
+
+
+func test_a_cast_cannot_begin_without_line_of_sight() -> void:
+	_add_wall_between()
+	await get_tree().physics_frame
+	assert_false(
+		resolver.try_begin_cast(caster, target, _spell("flamestrike")),
+		"you should not be able to start casting at what you cannot see"
+	)
+	assert_eq(
+		caster.entity_state.current_state,
+		EntityState.State.IDLE,
+		"a refused cast leaves you idle, not casting"
+	)
+
+
+func test_a_refused_cast_costs_nothing() -> void:
+	# Refusal is not a fizzle: no recovery, no lost tempo, nothing spent.
+	_add_wall_between()
+	await get_tree().physics_frame
+	var fizzles: Array = []
+	caster.entity_state.cast_fizzled.connect(func(s, r): fizzles.append([s, r]))
+	resolver.try_begin_cast(caster, target, _spell("flamestrike"))
+	assert_true(fizzles.is_empty(), "being refused is not a fizzle")
+
+
+func test_losing_the_shot_does_not_kill_a_cast_already_running() -> void:
+	# The check gates starting only. Once committed you stay committed, and the
+	# spell fails at resolution if the shot is gone by then.
+	await get_tree().physics_frame
+	resolver.try_begin_cast(caster, target, _spell("flamestrike"))
+	_add_wall_between()
+	await get_tree().physics_frame
+	assert_eq(
+		caster.entity_state.current_state,
+		EntityState.State.CASTING,
+		"cover appearing mid-cast must not cancel the cast"
+	)
+
+
+func test_a_refused_cast_does_not_fizzle_the_spell_already_in_progress() -> void:
+	# Otherwise losing the shot mid-fight would let a blocked keypress destroy the
+	# spell you were already casting.
+	await get_tree().physics_frame
+	resolver.try_begin_cast(caster, target, _spell("flamestrike"))
+	_add_wall_between()
+	await get_tree().physics_frame
+	assert_false(
+		resolver.try_begin_cast(caster, target, _spell("lightning")),
+		"the blocked recast is refused"
+	)
+	assert_eq(
+		caster.entity_state.current_spell.spell_name,
+		"Flamestrike",
+		"and the in-progress spell survives untouched"
+	)
+
+
+func test_a_spell_that_ignores_line_of_sight_can_always_begin() -> void:
+	_add_wall_between()
+	await get_tree().physics_frame
+	var spell := _spell("flamestrike").duplicate() as SpellData
+	spell.requires_line_of_sight = false
+	assert_true(
+		resolver.try_begin_cast(caster, target, spell),
+		"a spell flagged as not needing LOS should start behind cover"
+	)
+
+
 # ── full resolution: LOS gate + effect ────────────────────────────────────────
 
 func test_unobstructed_cast_damages_target() -> void:

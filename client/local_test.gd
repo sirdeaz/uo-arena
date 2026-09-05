@@ -153,7 +153,7 @@ func _run_dummy(delta: float) -> void:
 	if _dummy_think_timer < DUMMY_THINK_SECONDS:
 		return
 	_dummy_think_timer = 0.0
-	dummy.combatant.entity_state.try_start_cast(_spell("magic_arrow"))
+	resolver.try_begin_cast(dummy.combatant, player.combatant, _spell("magic_arrow"))
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -170,7 +170,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not player.combatant.is_alive():
 		return
 
-	player.combatant.entity_state.try_start_cast(_spell(SPELL_KEYS[key.keycode]))
+	var spell := _spell(SPELL_KEYS[key.keycode])
+	if not resolver.try_begin_cast(player.combatant, dummy.combatant, spell):
+		if not resolver.can_see(player.combatant, dummy.combatant):
+			_last_event = "%s — no line of sight" % spell.spell_name
 
 
 func _spell(spell_name: String) -> SpellData:

@@ -61,6 +61,10 @@ signal state that clears the next frame.
 - **Recast after the window:** denied outright. There is no cast queueing.
 - **Any damage interrupts**, including poison ticks. Paralyze interrupts too despite
   dealing no damage, because it connects.
+- **You need line of sight to start a cast.** Casting at someone behind a tent is
+  refused outright — nothing is spent, no recovery is paid, and any spell already
+  running is untouched. Losing the shot *mid-cast* does not cancel it; that spell still
+  fails at resolution, which is what makes dodging behind cover mid-flight worth doing.
 
 The chain is a feint tool, not just a punishment — a stream of cast-starts that never
 resolve baits an opponent into breaking line of sight or committing early. It also
