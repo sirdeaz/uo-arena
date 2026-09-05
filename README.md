@@ -55,10 +55,12 @@ godot --headless -- --server
 `EntityState` is `IDLE → CASTING → RECOVERING`, with `INTERRUPTED` as a momentary
 signal state that clears the next frame.
 
-- **Recast inside the fizzle window** (first 0.25s of a cast): the *in-progress* spell
-  fizzles, you pay `GLOBAL_CAST_RECOVERY_SECONDS` of recovery, and then the spell you
-  chained into starts. Nothing is castable during recovery.
-- **Recast after the window:** denied outright. There is no cast queueing.
+- **Recast at any point in a cast:** the *in-progress* spell fizzles, you pay
+  `GLOBAL_CAST_RECOVERY_SECONDS` of recovery, and then the spell you chained into
+  starts. Nothing is castable during recovery, and there is no queueing.
+- **Abandoning late costs the same as abandoning early.** If bailing out at the last
+  moment were cheaper, the strongest opening would always be a long cast held purely as
+  a threat and dropped for free.
 - **Any damage interrupts**, including poison ticks. Paralyze interrupts too despite
   dealing no damage, because it connects.
 - **You need line of sight to start a cast.** Casting at someone behind a tent is

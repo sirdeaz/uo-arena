@@ -56,12 +56,13 @@ func try_start_cast(spell: SpellData) -> bool:
 		return false
 
 	if current_state == State.CASTING:
-		if cast_time_elapsed >= current_spell.fizzle_window_seconds:
-			# Already resolving naturally; treat as denied — no queueing for now.
-			return false
-		# Casting again too soon fizzles the IN-PROGRESS spell, not the new one.
-		# The new one waits out the recovery instead of starting here.
-		_fizzle_cast("recast_too_soon")
+		# Casting again fizzles the IN-PROGRESS spell, not the new one, at any point in
+		# the cast. The new one waits out the recovery instead of starting here.
+		#
+		# Abandoning late costs exactly the same as abandoning early. If a late bail-out
+		# were cheaper, the strongest play would be to open every fight with a long cast
+		# purely as a threat and drop it for free.
+		_fizzle_cast("recast")
 		pending_spell = spell
 		recovery_time_elapsed = 0.0
 		_set_state(State.RECOVERING)
