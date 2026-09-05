@@ -37,6 +37,11 @@ var _effects: Array[Dictionary] = []
 ## sight line has to live on a layer of its own or the floor paints over it.
 var _sight_line: Node2D
 
+## Additive layer for spell bolts and impacts.
+var _bolts: Node2D
+
+var _fx_time: float = 0.0
+
 
 func _ready() -> void:
 	resolver = CombatResolver.new()
@@ -71,6 +76,13 @@ func _ready() -> void:
 	_sight_line.z_index = 5
 	add_child(_sight_line)
 	_sight_line.draw.connect(_draw_sight_line)
+
+	# Spell bolts get their own additive layer so they glow rather than tint.
+	_bolts = Node2D.new()
+	_bolts.z_index = 6
+	_bolts.material = SpellFX.additive_material()
+	add_child(_bolts)
+	_bolts.draw.connect(_draw_bolts)
 
 	_connect_combat(player, dummy)
 	_connect_combat(dummy, player)
@@ -111,15 +123,18 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 			"from": from.position,
 			"to": to.position,
 			"color": SpellVisuals.color_for(spell),
+			"flame": SpellVisuals.style_for(spell) == SpellVisuals.Style.FLAME,
 			"remaining": EFFECT_SECONDS,
 		})
 
 
 func _process(delta: float) -> void:
+	_fx_time += delta
 	_run_dummy(delta)
 	_age_effects(delta)
 	_update_hud()
 	_sight_line.queue_redraw()
+	_bolts.queue_redraw()
 
 
 func _age_effects(delta: float) -> void:
@@ -202,6 +217,43 @@ func _update_hud() -> void:
 	hud.text = "\n".join(lines)
 
 
+## The spell itself: a jagged filament with a white-hot core, and an impact that blows
+## a crackling ring outward. Flame wanders; arc snaps.
+func _draw_bolts() -> void:
+	for effect in _effects:
+		var fade: float = effect["remaining"] / EFFECT_SECONDS
+		var color: Color = effect["color"]
+		var from: Vector2 = effect["from"]
+		var to: Vector2 = effect["to"]
+		var flame: bool = effect["flame"]
+		var seed := SpellFX.crackle_seed(_fx_time)
+
+		var amplitude := (10.0 if flame else 18.0) * fade
+		var segments := 14 if flame else 20
+		var path := SpellFX.bolt_path(from, to, segments, amplitude, seed)
+		SpellFX.draw_glow_line(_bolts, path, color, fade, 2.4)
+
+		# A couple of forks off the main filament, arc spells only.
+		if not flame:
+			for i in 2:
+				var index := path.size() / 3 + i * path.size() / 3
+				var root: Vector2 = path[index]
+				var tip := root + Vector2(
+					(to - from).y, -(to - from).x
+				).normalized() * (24.0 * fade * (1.0 if i == 0 else -1.0))
+				var fork := SpellFX.bolt_path(root, tip, 4, 9.0, seed + 53 + i)
+				SpellFX.draw_glow_line(_bolts, fork, color, fade * 0.55, 0.5)
+
+		# Impact: expanding crackling ring plus a hot core.
+		var radius := 16.0 + (1.0 - fade) * 30.0
+		var ring := SpellFX.ring_path(radius, 26, radius * 0.14, seed + 11)
+		var shifted := PackedVector2Array()
+		for point in ring:
+			shifted.append(point + to)
+		SpellFX.draw_glow_line(_bolts, shifted, color, fade, 0.9, true)
+		SpellFX.draw_glow_disc(_bolts, to, radius * 1.1, color, fade)
+
+
 func _draw_sight_line() -> void:
 	# The shot the dummy has on you, drawn exactly as the raycast sees it.
 	var clear := _has_line_of_sight()
@@ -212,23 +264,8 @@ func _draw_sight_line() -> void:
 		2.0
 	)
 
-	for effect in _effects:
-		var fade: float = effect["remaining"] / EFFECT_SECONDS
-		var color: Color = effect["color"]
-		var from: Vector2 = effect["from"]
-		var to: Vector2 = effect["to"]
-
-		# Bolt: a wide soft trail with a bright core, so it reads even when it lies
-		# along the sight line.
-		_sight_line.draw_line(from, to, Color(color, fade * 0.35), 10.0)
-		_sight_line.draw_line(from, to, Color(color, fade), 3.0)
-
-		# Impact: an expanding ring plus a solid core that fades faster.
-		var radius := 14.0 + (1.0 - fade) * 26.0
-		_sight_line.draw_arc(to, radius, 0.0, TAU, 28, Color(color, fade), 3.0, true)
-		_sight_line.draw_circle(to, radius * 0.55, Color(color, fade * fade * 0.8))
-
 	# Where you are steering, while the move button is down.
+
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		var cursor := _sight_line.get_global_mouse_position()
 		_sight_line.draw_arc(cursor, 9.0, 0.0, TAU, 20, Color("#6ec6ff", 0.7), 2.0, true)
