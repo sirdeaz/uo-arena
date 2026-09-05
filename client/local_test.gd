@@ -7,6 +7,7 @@ extends Node2D
 ##   WASD    move
 ##   1-5     magic arrow / poison / lightning / flamestrike / paralyze
 ##   R       reset the round
+##   M       mute
 
 const SPELL_KEYS := {
 	KEY_1: "magic_arrow",
@@ -25,6 +26,7 @@ var player: Fighter
 var dummy: Fighter
 var cast_bar: CastBarUI
 var hud: Label
+var audio: SpellAudio
 
 var _dummy_think_timer: float = 0.0
 var _last_event: String = ""
@@ -72,10 +74,30 @@ func _ready() -> void:
 	add_child(_sight_line)
 	_sight_line.draw.connect(_draw_sight_line)
 
+	audio = SpellAudio.new()
+	add_child(audio)
+	_connect_audio(player)
+	_connect_audio(dummy)
+
 	_connect_combat(player, dummy)
 	_connect_combat(dummy, player)
 
 	_build_ui()
+
+
+## Both fighters are audible. Hearing the enemy start a cast is the read the mantras
+## give you visually, and hearing your own fizzle is the point of the whole system —
+## it happens while you are watching the sight line, not your own feet.
+func _connect_audio(fighter: Fighter) -> void:
+	var state := fighter.combatant.entity_state
+	state.cast_started.connect(func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_START))
+	state.cast_completed.connect(func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_RELEASE))
+	state.cast_fizzled.connect(
+		func(_spell: SpellData, _reason: String) -> void: audio.play(SpellAudio.Cue.FIZZLE)
+	)
+	state.cast_interrupted.connect(
+		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.INTERRUPT)
+	)
 
 
 func _connect_combat(from: Fighter, to: Fighter) -> void:
@@ -107,6 +129,10 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 		who, spell.spell_name, "hit" if connected else "blocked by cover"
 	]
 	if connected:
+		# Only a spell that lands makes a sound, the same rule the bolt and impact ring
+		# already follow: a blocked spell is silent and invisible, because in UO it
+		# simply never went off.
+		audio.play(SpellAudio.Cue.IMPACT)
 		_effects.append({
 			"from": from.position,
 			"to": to.position,
@@ -150,6 +176,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_tree().reload_current_scene()
 		return
 
+	if key.keycode == KEY_M:
+		audio.toggle_muted()
+		return
+
 	if not SPELL_KEYS.has(key.keycode):
 		return
 	if not player.combatant.is_alive():
@@ -180,7 +210,9 @@ func _update_hud() -> void:
 	var status := _describe(player.combatant.entity_state)
 
 	var lines := [
-		"hold RIGHT MOUSE to move toward the cursor    R reset",
+		"hold RIGHT MOUSE to move toward the cursor    R reset    M %s" % (
+			"unmute" if audio.is_muted() else "mute"
+		),
 		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze",
 		"",
 		"you %d    dummy %d" % [
