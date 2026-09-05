@@ -74,6 +74,24 @@ jobs:
           godot --headless --export-release "Web" build/web/index.html
           test -f build/web/index.html
           test -f build/web/index.wasm
+          # The share metadata is a string in export_presets.cfg, so nothing else would
+          # notice if it stopped being emitted. Without it the URL unfurls as a bare
+          # link, which is the whole point of having it.
+          grep -q 'property="og:image"' build/web/index.html
+          grep -q 'name="twitter:card"' build/web/index.html
+
+      - name: Capture the link preview image
+        # The og:image the page advertises has to exist inside the uploaded artifact, or
+        # every share unfurls with a broken image. It is a real rendered frame of the
+        # arena rather than a drawing, so this is the one step that needs a display.
+        run: |
+          set -euo pipefail
+          command -v xvfb-run >/dev/null 2>&1 || {
+            sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          }
+          xvfb-run -a godot --audio-driver Dummy --resolution 1280x720 \
+            res://tools/capture_promo_shot.tscn -- --out build/web/og-image.png
+          test -f build/web/og-image.png
 
       - name: Stop Pages serving the build as Jekyll
         run: touch build/web/.nojekyll
