@@ -17,7 +17,6 @@ const SPELL_KEYS := {
 }
 
 const DUMMY_THINK_SECONDS: float = 0.9
-const EFFECT_SECONDS: float = 0.55
 
 var map: ArenaMap
 var resolver: CombatResolver
@@ -29,18 +28,13 @@ var hud: Label
 var _dummy_think_timer: float = 0.0
 var _last_event: String = ""
 
-## Brief bolt-and-flash for spells that connected. Blocked spells show nothing at all,
-## matching UO, where a spell you have no line to simply never goes off.
-var _effects: Array[Dictionary] = []
-
 ## Drawn above the arena floor — this node draws itself before its children, so the
 ## sight line has to live on a layer of its own or the floor paints over it.
 var _sight_line: Node2D
 
-## Additive layer for spell bolts and impacts.
-var _bolts: Node2D
-
-var _fx_time: float = 0.0
+## Bolts and impacts for spells that connected. Blocked spells add nothing at all,
+## matching UO, where a spell you have no line to simply never goes off.
+var _bolts: BoltLayer
 
 
 func _ready() -> void:
@@ -78,11 +72,8 @@ func _ready() -> void:
 	_sight_line.draw.connect(_draw_sight_line)
 
 	# Spell bolts get their own additive layer so they glow rather than tint.
-	_bolts = Node2D.new()
-	_bolts.z_index = 6
-	_bolts.material = SpellFX.additive_material()
+	_bolts = BoltLayer.new()
 	add_child(_bolts)
-	_bolts.draw.connect(_draw_bolts)
 
 	_connect_combat(player, dummy)
 	_connect_combat(dummy, player)
@@ -119,28 +110,13 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 		who, spell.spell_name, "hit" if connected else "blocked by cover"
 	]
 	if connected:
-		_effects.append({
-			"from": from.position,
-			"to": to.position,
-			"color": SpellVisuals.color_for(spell),
-			"flame": SpellVisuals.style_for(spell) == SpellVisuals.Style.FLAME,
-			"remaining": EFFECT_SECONDS,
-		})
+		_bolts.add_effect(from.position, to.position, spell)
 
 
 func _process(delta: float) -> void:
-	_fx_time += delta
 	_run_dummy(delta)
-	_age_effects(delta)
 	_update_hud()
 	_sight_line.queue_redraw()
-	_bolts.queue_redraw()
-
-
-func _age_effects(delta: float) -> void:
-	for effect in _effects:
-		effect["remaining"] -= delta
-	_effects = _effects.filter(func(e: Dictionary) -> bool: return e["remaining"] > 0.0)
 
 
 func _run_dummy(delta: float) -> void:
@@ -218,43 +194,6 @@ func _update_hud() -> void:
 		lines.append("dummy down — R to reset")
 
 	hud.text = "\n".join(lines)
-
-
-## The spell itself: a jagged filament with a white-hot core, and an impact that blows
-## a crackling ring outward. Flame wanders; arc snaps.
-func _draw_bolts() -> void:
-	for effect in _effects:
-		var fade: float = effect["remaining"] / EFFECT_SECONDS
-		var color: Color = effect["color"]
-		var from: Vector2 = effect["from"]
-		var to: Vector2 = effect["to"]
-		var flame: bool = effect["flame"]
-		var seed := SpellFX.crackle_seed(_fx_time)
-
-		var amplitude := (10.0 if flame else 18.0) * fade
-		var segments := 14 if flame else 20
-		var path := SpellFX.bolt_path(from, to, segments, amplitude, seed)
-		SpellFX.draw_glow_line(_bolts, path, color, fade, 2.4)
-
-		# A couple of forks off the main filament, arc spells only.
-		if not flame:
-			for i in 2:
-				var index := path.size() / 3 + i * path.size() / 3
-				var root: Vector2 = path[index]
-				var tip := root + Vector2(
-					(to - from).y, -(to - from).x
-				).normalized() * (24.0 * fade * (1.0 if i == 0 else -1.0))
-				var fork := SpellFX.bolt_path(root, tip, 4, 9.0, seed + 53 + i)
-				SpellFX.draw_glow_line(_bolts, fork, color, fade * 0.55, 0.5)
-
-		# Impact: expanding crackling ring plus a hot core.
-		var radius := 16.0 + (1.0 - fade) * 30.0
-		var ring := SpellFX.ring_path(radius, 26, radius * 0.14, seed + 11)
-		var shifted := PackedVector2Array()
-		for point in ring:
-			shifted.append(point + to)
-		SpellFX.draw_glow_line(_bolts, shifted, color, fade, 0.9, true)
-		SpellFX.draw_glow_disc(_bolts, to, radius * 1.1, color, fade)
 
 
 func _draw_sight_line() -> void:

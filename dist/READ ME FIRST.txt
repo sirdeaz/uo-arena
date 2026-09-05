@@ -31,14 +31,14 @@ WHAT AM I LOOKING AT
 
 TRY THIS
   1. Stand still in the open and hold 4. You will get interrupted every time.
-     Any damage breaks a cast, and there is no refund.
+	 Any damage breaks a cast, and there is no refund.
 
   2. Press 4, then immediately press 3. The flamestrike fizzles into a
-     lightning. Spam it and you will cast nothing at all - that is deliberate,
-     and it is also how you bait someone into dodging early.
+	 lightning. Spam it and you will cast nothing at all - that is deliberate,
+	 and it is also how you bait someone into dodging early.
 
   3. Walk off the middle lane while the dummy is casting. Watch the line turn
-     red and its spells stop landing.
+	 red and its spells stop landing.
 
 
 This is an early prototype - one arena, one dummy, no multiplayer yet.

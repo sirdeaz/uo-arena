@@ -17,6 +17,12 @@ class_name EntityState
 
 enum State { IDLE, CASTING, RECOVERING, INTERRUPTED }
 
+## The three things that end a cast. They are grouped as an enum because a client
+## mirroring someone else's caster cannot tell them apart from sampled state — a fizzle
+## and an interrupt leave the machine looking identical a frame later — so the server
+## has to name which one happened.
+enum Event { COMPLETED, FIZZLED, INTERRUPTED }
+
 signal cast_started(spell: SpellData)
 signal cast_completed(spell: SpellData)
 signal cast_fizzled(spell: SpellData, reason: String)
@@ -32,12 +38,11 @@ var pending_spell: SpellData = null
 var recovery_time_elapsed: float = 0.0
 
 
-func _process(delta: float) -> void:
-	tick(delta)
-
-
-## Advances cast and recovery timers. Split out of `_process` so the server can drive
-## it on a fixed step and so tests can step exact windows.
+## Advances cast and recovery timers. Nothing calls this on its own: whoever owns this
+## machine drives it on a fixed step. That used to be `_process`, which was wrong in two
+## directions at once — a headless server with no vsync would have completed casts at
+## thousands of hertz, and a client mirroring someone else's caster would have decided
+## for itself that their spell had landed.
 func tick(delta: float) -> void:
 	match current_state:
 		State.CASTING:
@@ -82,6 +87,82 @@ func interrupt_cast() -> void:
 	# INTERRUPTED is a momentary signal state, not a sticky one. Clear it next frame —
 	# but only if nothing has started since, or we would cancel that new cast.
 	_clear_transient_state.call_deferred(State.INTERRUPTED)
+
+
+## Wipes the machine back to idle without announcing anything. Respawning is not a
+## fizzle and not an interrupt — the cast simply never happened, and nothing should
+## flash. Clearing `pending_spell` is the point of this existing at all: without it,
+## someone who dies mid-fizzle-chain stands back up already casting whatever was queued
+## behind the spell that killed them.
+func reset() -> void:
+	current_spell = null
+	pending_spell = null
+	cast_time_elapsed = 0.0
+	recovery_time_elapsed = 0.0
+	if current_state != State.IDLE:
+		_set_state(State.IDLE)
+
+
+# ── Mirroring a caster the server owns ────────────────────────────────────────────
+
+
+## Moves the visible timers and nothing else. Corrections arrive at `SNAPSHOT_HZ` but
+## the cast bar and the charging aura are drawn every frame, so a mirror has to fill in
+## between updates — while never being allowed to reach a conclusion. Deciding that a
+## cast has landed is the server's call alone, so this cannot transition and cannot
+## emit. Timers stop at their limit rather than running past it, which leaves a
+## finished-looking bar sitting full for the few milliseconds until the server agrees.
+func advance_display_only(delta: float) -> void:
+	match current_state:
+		State.CASTING:
+			if current_spell == null:
+				return
+			cast_time_elapsed = minf(
+				cast_time_elapsed + delta, current_spell.cast_time_seconds
+			)
+		State.RECOVERING:
+			recovery_time_elapsed = minf(
+				recovery_time_elapsed + delta, Constants.GLOBAL_CAST_RECOVERY_SECONDS
+			)
+
+
+## Overwrites this machine from an authoritative snapshot. Emits `state_changed`, and
+## `cast_started` when a cast begins because the cast bar keys its flash off that — but
+## never the three ending events, which are announced separately by the server.
+func apply_remote_state(
+	state: State, spell: SpellData, cast_elapsed: float, recovery_elapsed: float
+) -> void:
+	# A CASTING record with no spell is a truncated or malformed snapshot. Read it as
+	# idle rather than letting a null reference reach the drawing code.
+	if state == State.CASTING and spell == null:
+		state = State.IDLE
+
+	var begins_cast := state == State.CASTING \
+		and (current_state != State.CASTING or current_spell != spell)
+
+	current_spell = spell
+	cast_time_elapsed = cast_elapsed
+	recovery_time_elapsed = recovery_elapsed
+
+	# Only on a real transition: `state_changed` at snapshot rate would be noise.
+	if state != current_state:
+		_set_state(state)
+
+	if begins_cast:
+		cast_started.emit(spell)
+
+
+## Replays an ending the server announced, so the cast bar's flash and the fighter's
+## release / fizzle / interrupt bursts work on a mirrored caster with no change at all
+## to the code that draws them.
+func emit_remote_event(event: Event, spell: SpellData) -> void:
+	match event:
+		Event.COMPLETED:
+			cast_completed.emit(spell)
+		Event.FIZZLED:
+			cast_fizzled.emit(spell, "recast")
+		Event.INTERRUPTED:
+			cast_interrupted.emit(spell)
 
 
 func _begin_cast(spell: SpellData) -> void:

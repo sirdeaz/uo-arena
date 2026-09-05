@@ -48,8 +48,62 @@ func _reachable_ring(origin: Vector2) -> Array[Vector2]:
 
 # ── structure ─────────────────────────────────────────────────────────────────
 
-func test_map_has_two_spawn_points() -> void:
-	assert_eq(map.get_spawn_positions().size(), 2, "1v1 needs exactly two spawns")
+func test_map_has_a_spawn_for_every_player() -> void:
+	assert_eq(
+		map.get_spawn_positions().size(),
+		Constants.MAX_PLAYERS,
+		"a full arena needs somewhere for everyone to stand"
+	)
+
+
+func test_the_first_two_spawns_are_still_the_duel_lane() -> void:
+	# Several tests below read spawns[0] and spawns[1] as "the opening shot". Reordering
+	# the markers in the editor would quietly repoint them at some other pair.
+	var spawns := map.get_spawn_positions()
+	assert_eq(spawns[0], Vector2(-500.0, 0.0), "the west duel spawn moved")
+	assert_eq(spawns[1], Vector2(500.0, 0.0), "the east duel spawn moved")
+
+
+func test_every_spawn_has_a_rotational_partner() -> void:
+	# The fairness property, asserted directly rather than inferred from raycast counts:
+	# if every spawn's mirror through the centre is also a spawn, no starting position
+	# can be the good one.
+	var spawns := map.get_spawn_positions()
+	for spawn in spawns:
+		var partnered := false
+		for other in spawns:
+			if other.distance_to(-spawn) < 0.001:
+				partnered = true
+				break
+		assert_true(partnered, "%s has no opposite number" % spawn)
+
+
+func test_no_spawn_sits_inside_cover() -> void:
+	await get_tree().physics_frame
+	for spawn in map.get_spawn_positions():
+		var query := PhysicsShapeQueryParameters2D.new()
+		var circle := CircleShape2D.new()
+		circle.radius = Constants.PLAYER_RADIUS
+		query.shape = circle
+		query.transform = Transform2D(0.0, spawn)
+		query.collision_mask = Constants.LAYER_OBSTACLES
+		assert_true(
+			_space_state().intersect_shape(query).is_empty(),
+			"%s spawns you inside a wall or a tent" % spawn
+		)
+
+
+func test_spawns_do_not_overlap_each_other() -> void:
+	# Two players appearing on top of one another is not fatal — bodies pass through
+	# each other — but it does mean neither can tell whose health bar is whose.
+	var spawns := map.get_spawn_positions()
+	var minimum := Constants.PLAYER_RADIUS * 4.0
+	for i in spawns.size():
+		for j in range(i + 1, spawns.size()):
+			assert_true(
+				spawns[i].distance_to(spawns[j]) >= minimum,
+				"%s and %s are close enough to overlap" % [spawns[i], spawns[j]]
+			)
 
 
 func test_cover_pieces_are_within_the_planned_count() -> void:
@@ -97,10 +151,13 @@ func test_spawns_are_far_enough_apart_to_need_movement() -> void:
 
 
 func test_each_player_can_break_line_of_sight_within_two_seconds() -> void:
+	# Checked from every spawn now, not just the duel pair, each against the enemy who
+	# starts furthest away — its rotational partner. A spawn you cannot find cover from
+	# is a spawn nobody should be put on.
 	await get_tree().physics_frame
 	var spawns := map.get_spawn_positions()
 	for i in spawns.size():
-		var enemy: Vector2 = spawns[1 - i]
+		var enemy: Vector2 = -spawns[i]
 		var found_cover := false
 		for point in _reachable_ring(spawns[i]):
 			if not resolver.has_line_of_sight(_space_state(), point, enemy):
