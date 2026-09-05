@@ -49,6 +49,22 @@ if ($Windows) {
     $out = Join-Path $root "build\windows"
     $output = Export-Preset "Windows Desktop" $out
 
+    # Godot needs rcedit to stamp the icon onto the .exe, and it is configured in
+    # Editor Settings rather than anywhere this repo controls. Without it the export
+    # succeeds and quietly ships an executable wearing the default Godot logo — on an
+    # unsigned build that already has to argue its way past SmartScreen, which is the
+    # worst possible first impression. Refuse to ship that silently.
+    if ($output -match "rcedit") {
+        throw @"
+The export could not apply icon.ico to the executable, so it would ship with the
+default Godot icon.
+
+Godot needs the rcedit tool for this. Download rcedit-x64.exe from
+https://github.com/electron/rcedit/releases and point Godot at it in
+Editor Settings > Export > Windows > Rcedit, then run this script again.
+"@
+    }
+
     # Stage with the player-facing readme, then zip.
     $stage = Join-Path $root "build\UOArena-win64"
     if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
