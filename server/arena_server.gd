@@ -17,23 +17,17 @@ signal cast_event(peer_id: int, event: EntityState.Event, spell_id: int)
 signal spell_resolved(caster_peer: int, target_peer: int, spell_id: int, connected: bool)
 signal roster_changed()
 
-## Ten bodies that stay apart at a glance. Telling players apart matters more than the
-## palette being pretty, so these are spread around the wheel. The first two are the
-## colours the practice harness already uses, so a duel looks like it always has.
-const BODY_COLORS: Array[Color] = [
-	Color("#6ec6ff"), Color("#e2574c"), Color("#7ee081"), Color("#ffd166"),
-	Color("#c58cff"), Color("#ff9f6e"), Color("#5ad1c8"), Color("#f279c0"),
-	Color("#b0bec5"), Color("#d4e157"),
-]
-
-
 ## One player as the server sees them. The two target fields are separate on purpose;
 ## `_on_cast_started` explains why.
 class Player extends RefCounted:
 	var peer_id: int
 	var combatant: Combatant
 	var body: PlayerBody
-	var color: Color
+
+	## Which of the arena's slots this player holds. The server hands out a number and
+	## stops there — what a slot *looks* like is the client's business, and `server/`
+	## has to stay free of rendering for the Dedicated Server export to stay clean.
+	var slot: int
 
 	var input: Vector2 = Vector2.ZERO
 	var seconds_since_input: float = 0.0
@@ -77,7 +71,7 @@ func add_player(peer_id: int) -> bool:
 
 	var player := Player.new()
 	player.peer_id = peer_id
-	player.color = BODY_COLORS[_free_color_index()]
+	player.slot = _free_slot()
 
 	player.combatant = Combatant.new()
 	add_child(player.combatant)
@@ -136,10 +130,10 @@ func peer_ids() -> PackedInt32Array:
 	return ids
 
 
-func colors() -> PackedColorArray:
-	var out := PackedColorArray()
+func slots() -> PackedInt32Array:
+	var out := PackedInt32Array()
 	for peer_id in _players:
-		out.append(_players[peer_id].color)
+		out.append(_players[peer_id].slot)
 	return out
 
 
@@ -311,13 +305,15 @@ func _within_request_budget(player: Player) -> bool:
 	return true
 
 
-func _free_color_index() -> int:
+## The lowest slot nobody holds, so a player who leaves frees their number for the next
+## arrival rather than leaving a gap.
+func _free_slot() -> int:
 	var taken := {}
 	for peer_id in _players:
-		taken[_players[peer_id].color] = true
-	for index in BODY_COLORS.size():
-		if not taken.has(BODY_COLORS[index]):
-			return index
+		taken[_players[peer_id].slot] = true
+	for slot in Constants.MAX_PLAYERS:
+		if not taken.has(slot):
+			return slot
 	return 0
 
 

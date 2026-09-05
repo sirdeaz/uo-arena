@@ -96,7 +96,7 @@ func _build_ui() -> void:
 
 	hud = Label.new()
 	hud.position = Vector2(24.0, 20.0)
-	hud.add_theme_color_override("font_color", Color("#c8d0e0"))
+	hud.add_theme_color_override("font_color", Palette.UI_TEXT)
 	layer.add_child(hud)
 
 
@@ -105,12 +105,16 @@ func _build_ui() -> void:
 
 ## The full roster, resent on every join and leave. Idempotent on purpose: working out
 ## incremental adds and removes would be one more thing that can drift out of step.
-func apply_roster(peer_ids: PackedInt32Array, roster_colors: PackedColorArray) -> void:
+##
+## The server sends slot numbers, not colours — what a slot looks like is decided here,
+## which is why `server/` never has to know what rose means.
+func apply_roster(peer_ids: PackedInt32Array, slots: PackedInt32Array) -> void:
 	var present := {}
 	for index in peer_ids.size():
 		var peer_id := peer_ids[index]
 		present[peer_id] = true
-		var color := roster_colors[index] if index < roster_colors.size() else Color.WHITE
+		var slot := slots[index] if index < slots.size() else index
+		var color := _color_for(peer_id, slot)
 		if _fighters.has(peer_id):
 			_fighters[peer_id].body_color = color
 		else:
@@ -259,6 +263,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 # ── Internals ─────────────────────────────────────────────────────────────────────
 
 
+## You are always blue; everyone else wears their slot. Keeping "blue is you" true is
+## worth more mid-fight than giving yourself a unique colour would be — the first read
+## is always "is that me", and it should cost nothing.
+func _color_for(peer_id: int, slot: int) -> Color:
+	if peer_id == local_peer_id:
+		return Palette.PLAYER
+	return Palette.opponent_body(slot)
+
+
 func _add_fighter(peer_id: int, color: Color) -> void:
 	var fighter := Fighter.new()
 	fighter.body_color = color
@@ -358,21 +371,34 @@ func _draw_sight_line() -> void:
 
 	if _fighters.has(_target_peer):
 		var target: Fighter = _fighters[_target_peer]
-		# The shot as the raycast sees it, same as the practice harness draws it.
-		var clear := _has_line_of_sight_to_target()
-		_sight_line.draw_line(
-			fighter.position,
-			target.position,
-			Color("#7ee081", 0.55) if clear else Color("#e2574c", 0.30),
-			2.0
-		)
+		# Whether there is a shot is a spatial fact, so it is drawn spatially — solid
+		# when the line is live, dashed when cover has broken it. Same vocabulary the
+		# practice harness uses.
+		if _has_line_of_sight_to_target():
+			_sight_line.draw_line(
+				fighter.position,
+				target.position,
+				Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_CLEAR_ALPHA),
+				2.0
+			)
+		else:
+			_sight_line.draw_dashed_line(
+				fighter.position,
+				target.position,
+				Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_BLOCKED_ALPHA),
+				2.0,
+				Palette.SIGHT_LINE_DASH
+			)
+
+		# Who you have selected, in their own body colour — the ring is that player,
+		# picked out, not a new thing to learn.
 		_sight_line.draw_arc(
 			target.position,
 			Constants.PLAYER_RADIUS + 6.0,
 			0.0,
 			TAU,
 			24,
-			Color("#ffffff", 0.75),
+			target.body_color,
 			2.0,
 			true
 		)
@@ -380,5 +406,10 @@ func _draw_sight_line() -> void:
 	# Where you are steering, while the move button is down.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		var cursor := _sight_line.get_global_mouse_position()
-		_sight_line.draw_arc(cursor, 9.0, 0.0, TAU, 20, Color("#6ec6ff", 0.7), 2.0, true)
-		_sight_line.draw_line(fighter.position, cursor, Color("#6ec6ff", 0.22), 1.0)
+		_sight_line.draw_arc(
+			cursor, 9.0, 0.0, TAU, 20,
+			Color(Palette.PLAYER, Palette.STEER_CURSOR_ALPHA), 2.0, true
+		)
+		_sight_line.draw_line(
+			fighter.position, cursor, Color(Palette.PLAYER, Palette.STEER_LINE_ALPHA), 1.0
+		)

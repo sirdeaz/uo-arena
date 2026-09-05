@@ -57,12 +57,12 @@ func _ready() -> void:
 
 	player = Fighter.new()
 	player.player_controlled = true
-	player.body_color = Color("#6ec6ff")
+	player.body_color = Palette.PLAYER
 	player.position = spawns[0]
 	add_child(player)
 
 	dummy = Fighter.new()
-	dummy.body_color = Color("#e2574c")
+	dummy.body_color = Palette.DUMMY
 	dummy.position = spawns[1]
 	add_child(dummy)
 
@@ -99,7 +99,7 @@ func _build_ui() -> void:
 
 	hud = Label.new()
 	hud.position = Vector2(24.0, 20.0)
-	hud.add_theme_color_override("font_color", Color("#c8d0e0"))
+	hud.add_theme_color_override("font_color", Palette.UI_TEXT)
 	layer.add_child(hud)
 
 
@@ -197,18 +197,36 @@ func _update_hud() -> void:
 
 
 func _draw_sight_line() -> void:
-	# The shot the dummy has on you, drawn exactly as the raycast sees it.
-	var clear := _has_line_of_sight()
-	_sight_line.draw_line(
-		player.position,
-		dummy.position,
-		Color("#7ee081", 0.55) if clear else Color("#e2574c", 0.30),
-		2.0
-	)
+	# The shot the dummy has on you, drawn exactly as the raycast sees it. Whether the
+	# line is live is a spatial fact, so it is drawn spatially — solid and bright when
+	# there is a shot, dashed and faint when cover has broken it. It used to be
+	# green-versus-red, which meant the two most loaded colours on screen were being
+	# spent here as well as on health, poison and cast feedback.
+	if _has_line_of_sight():
+		_sight_line.draw_line(
+			player.position,
+			dummy.position,
+			Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_CLEAR_ALPHA),
+			2.0
+		)
+	else:
+		_sight_line.draw_dashed_line(
+			player.position,
+			dummy.position,
+			Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_BLOCKED_ALPHA),
+			2.0,
+			Palette.SIGHT_LINE_DASH
+		)
 
 	# Where you are steering, while the move button is down.
 
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		var cursor := _sight_line.get_global_mouse_position()
-		_sight_line.draw_arc(cursor, 9.0, 0.0, TAU, 20, Color("#6ec6ff", 0.7), 2.0, true)
-		_sight_line.draw_line(player.position, cursor, Color("#6ec6ff", 0.22), 1.0)
+		_sight_line.draw_arc(
+			cursor, 9.0, 0.0, TAU, 20,
+			Color(Palette.PLAYER, Palette.STEER_CURSOR_ALPHA), 2.0, true
+		)
+		_sight_line.draw_line(
+			player.position, cursor,
+			Color(Palette.PLAYER, Palette.STEER_LINE_ALPHA), 1.0
+		)

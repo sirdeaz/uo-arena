@@ -142,7 +142,7 @@ func _on_peer_disconnected(peer_id: int) -> void:
 
 func _broadcast_roster() -> void:
 	if arena_server != null:
-		receive_roster.rpc(arena_server.peer_ids(), arena_server.colors())
+		receive_roster.rpc(arena_server.peer_ids(), arena_server.slots())
 
 
 func _on_snapshot_ready(records: Array) -> void:
@@ -310,9 +310,9 @@ func receive_spell_resolved(
 
 
 @rpc("authority", "call_remote", "reliable")
-func receive_roster(peer_ids: PackedInt32Array, roster_colors: PackedColorArray) -> void:
+func receive_roster(peer_ids: PackedInt32Array, slots: PackedInt32Array) -> void:
 	if arena_client != null:
-		arena_client.apply_roster(peer_ids, roster_colors)
+		arena_client.apply_roster(peer_ids, slots)
 
 
 @rpc("authority", "call_remote", "reliable")

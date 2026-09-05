@@ -84,13 +84,27 @@ func test_the_same_peer_cannot_join_twice() -> void:
 	assert_eq(server.player_count(), 1, "and did not add a second body")
 
 
-func test_everyone_gets_their_own_colour() -> void:
+func test_everyone_gets_their_own_slot() -> void:
+	# The server hands out numbers and stops there — what a slot looks like is the
+	# client's business, which is how `server/` stays free of rendering.
 	for index in Constants.MAX_PLAYERS:
 		server.add_player(index + 2)
 	var seen := {}
-	for color in server.colors():
-		assert_false(seen.has(color), "two players share a colour")
-		seen[color] = true
+	for slot in server.slots():
+		assert_false(seen.has(slot), "two players hold slot %d" % slot)
+		seen[slot] = true
+
+
+func test_a_slot_is_reused_once_its_player_leaves() -> void:
+	server.add_player(2)
+	server.add_player(3)
+	server.remove_player(2)
+	server.add_player(4)
+	assert_eq(server.slots().size(), 2, "two players, two slots")
+	var seen := {}
+	for slot in server.slots():
+		assert_false(seen.has(slot), "a freed slot was handed out twice over")
+		seen[slot] = true
 
 
 func test_leaving_removes_the_player() -> void:

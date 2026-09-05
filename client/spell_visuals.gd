@@ -9,7 +9,7 @@ class_name SpellVisuals
 ## orange fire read as different materials, not just different hues.
 enum Style { ARC, FLAME }
 
-const FALLBACK_COLOR := Color("#d8d8d8")
+const FALLBACK_COLOR := Palette.SPELL_UNKNOWN
 
 const STYLES := {
 	"Magic Arrow": Style.ARC,
@@ -19,12 +19,14 @@ const STYLES := {
 	"Paralyze": Style.ARC,
 }
 
+## The colours themselves live in `Palette` so poison and paralyze can be one value
+## shared with the status ring each of them leaves behind, rather than two that drift.
 const COLORS := {
-	"Magic Arrow": Color("#9fd8ff"),
-	"Poison": Color("#7ee081"),
-	"Lightning": Color("#fff2a8"),
-	"Flamestrike": Color("#ff8a4c"),
-	"Paralyze": Color("#ffd166"),
+	"Magic Arrow": Palette.SPELL_MAGIC_ARROW,
+	"Poison": Palette.SPELL_POISON,
+	"Lightning": Palette.SPELL_LIGHTNING,
+	"Flamestrike": Palette.SPELL_FLAMESTRIKE,
+	"Paralyze": Palette.SPELL_PARALYZE,
 }
 
 

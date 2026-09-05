@@ -28,10 +28,10 @@ func after_each() -> void:
 
 func _roster(peer_ids: Array) -> void:
 	var ids := PackedInt32Array(peer_ids)
-	var colors := PackedColorArray()
-	for _id in peer_ids:
-		colors.append(Color.WHITE)
-	client.apply_roster(ids, colors)
+	var slots := PackedInt32Array()
+	for index in peer_ids.size():
+		slots.append(index)
+	client.apply_roster(ids, slots)
 
 
 func _fighter(peer_id: int) -> Fighter:
@@ -66,6 +66,19 @@ func test_a_player_leaving_takes_their_fighter_with_them() -> void:
 	_roster([LOCAL])
 	assert_eq(_fighter(OTHER), null, "a player who left should stop being drawn")
 	assert_true(_fighter(LOCAL) != null, "and you should still be here")
+
+
+func test_you_are_blue_and_nobody_else_is() -> void:
+	# The first read in a ten-player brawl is "is that me", and it should cost nothing.
+	_roster([LOCAL, OTHER, 4])
+	assert_eq(_fighter(LOCAL).body_color, Palette.PLAYER, "you are always the blue one")
+	assert_false(
+		_fighter(OTHER).body_color == Palette.PLAYER, "an opponent must not wear your colour"
+	)
+	assert_false(
+		_fighter(OTHER).body_color == _fighter(4).body_color,
+		"two opponents in different slots should be told apart"
+	)
 
 
 func test_a_repeated_roster_does_not_rebuild_your_fighter() -> void:

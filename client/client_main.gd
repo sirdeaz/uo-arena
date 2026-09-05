@@ -44,12 +44,12 @@ func _build_ui() -> void:
 	var title := Label.new()
 	title.text = "UO Arena"
 	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Color("#dcd0ff"))
+	title.add_theme_color_override("font_color", Palette.MANTRA)
 	panel.add_child(title)
 
 	var hint := Label.new()
 	hint.text = "Enter the address of a server, or practise on your own."
-	hint.add_theme_color_override("font_color", Color("#8a8f9c"))
+	hint.add_theme_color_override("font_color", Palette.CAST_FIZZLED)
 	panel.add_child(hint)
 
 	_address = LineEdit.new()
@@ -72,7 +72,7 @@ func _build_ui() -> void:
 	panel.add_child(practice)
 
 	_status = Label.new()
-	_status.add_theme_color_override("font_color", Color("#ffa447"))
+	_status.add_theme_color_override("font_color", Palette.CAST_INTERRUPTED)
 	panel.add_child(_status)
 
 
