@@ -12,6 +12,15 @@ class_name ArenaMap
 const HALF_WIDTH: float = 600.0
 const HALF_HEIGHT: float = 400.0
 
+## What a piece of cover is, so the client can draw a tent as a tent. Carried as a node
+## group rather than a script or a sprite: a group is plain scene data, it survives a
+## rename, it is one checkbox in the editor's Node > Groups panel, and `server/` gains
+## no rendering code by having it.
+enum CoverKind { UNKNOWN, TENT, ROCK }
+
+const GROUP_TENT := "cover_tent"
+const GROUP_ROCK := "cover_rock"
+
 
 ## Every spawn, in scene order. Two things about that order are load-bearing, so if you
 ## drag markers about in the editor, keep them:
@@ -33,6 +42,16 @@ func get_cover_pieces() -> Array[StaticBody2D]:
 	for child in $Cover.get_children():
 		pieces.append(child)
 	return pieces
+
+
+## The kind hint on a cover piece. `UNKNOWN` is drawn as a plain block rather than
+## guessed at, so a new piece added without a group still shows up.
+static func cover_kind(piece: Node) -> CoverKind:
+	if piece.is_in_group(GROUP_TENT):
+		return CoverKind.TENT
+	if piece.is_in_group(GROUP_ROCK):
+		return CoverKind.ROCK
+	return CoverKind.UNKNOWN
 
 
 func is_inside_bounds(point: Vector2) -> bool:

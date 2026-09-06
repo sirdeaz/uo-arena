@@ -19,7 +19,7 @@ script = ExtResource("1_arena_map")
 
 [node name="Cover" type="Node2D" parent="."]
 
-[node name="TentNorth" type="StaticBody2D" parent="Cover"]
+[node name="TentNorth" type="StaticBody2D" parent="Cover" groups=["cover_tent"]]
 position = Vector2(0, -140)
 collision_layer = 2
 collision_mask = 0
@@ -27,7 +27,7 @@ collision_mask = 0
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Cover/TentNorth"]
 shape = SubResource("TentShape")
 
-[node name="TentSouth" type="StaticBody2D" parent="Cover"]
+[node name="TentSouth" type="StaticBody2D" parent="Cover" groups=["cover_tent"]]
 position = Vector2(0, 140)
 collision_layer = 2
 collision_mask = 0
@@ -35,7 +35,7 @@ collision_mask = 0
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Cover/TentSouth"]
 shape = SubResource("TentShape")
 
-[node name="RockSouthWest" type="StaticBody2D" parent="Cover"]
+[node name="RockSouthWest" type="StaticBody2D" parent="Cover" groups=["cover_rock"]]
 position = Vector2(-280, 240)
 collision_layer = 2
 collision_mask = 0
@@ -43,7 +43,7 @@ collision_mask = 0
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Cover/RockSouthWest"]
 shape = SubResource("RockShape")
 
-[node name="RockNorthEast" type="StaticBody2D" parent="Cover"]
+[node name="RockNorthEast" type="StaticBody2D" parent="Cover" groups=["cover_rock"]]
 position = Vector2(280, -240)
 collision_layer = 2
 collision_mask = 0

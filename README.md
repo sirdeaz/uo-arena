@@ -24,18 +24,31 @@ ENet, so a page cannot join a server — multiplayer needs a native build. (The 
 is isolated behind two functions in `network_manager.gd`; moving to WebSockets, which
 browsers *can* speak, is a change to those two and nothing else.)
 
-Prefer a native build? **[Download the Windows version](../../releases/latest)** — unzip,
-double-click `UOArena.exe`. It's unsigned, so Windows shows a "more info → run anyway"
-prompt. The browser link avoids that entirely.
+Prefer a native build? **[Download it](../../releases/latest)** — Windows (unzip,
+double-click `UOArena.exe`; it's unsigned, so Windows shows a "more info → run anyway"
+prompt) or Linux (untar, `chmod +x UOArena.x86_64`, run it). The browser link avoids all
+of that entirely.
 
 ## Requirements
 
-- Godot 4.x (installed here via `winget install GodotEngine.GodotEngine`)
+- Godot 4.x
 - Git
 
-Godot is **not** on `PATH` after a winget install, so `godot` alone won't work. The
-`run_game.ps1` and `run_tests.ps1` scripts locate it for you; set `GODOT_BIN` to override
-which executable they use.
+| | Install |
+| --- | --- |
+| Arch / Omarchy | `sudo pacman -S godot` |
+| Debian / Ubuntu | `sudo apt install godot4`, or download from [godotengine.org](https://godotengine.org/download) |
+| macOS | `brew install --cask godot` |
+| Windows | `winget install GodotEngine.GodotEngine` |
+
+The scripts find Godot themselves: `$GODOT_BIN` if you set it, otherwise `godot4` or
+`godot` on `PATH`, otherwise the winget install location on Windows — winget does not put
+Godot on `PATH`, which is why that last step exists. Set `GODOT_BIN` to use a specific
+build.
+
+Flatpak Godot is deliberately not searched for: it is sandboxed, so it needs `flatpak
+run` rather than a path and cannot see the project directory or write `build/` without
+explicit filesystem grants. Point `GODOT_BIN` at a wrapper script if you want it anyway.
 
 ## Layout
 
@@ -122,38 +135,47 @@ means spam-casting lands nothing at all.
 
 ## Giving it to someone who doesn't code
 
-```bash
-powershell -File build.ps1
+```sh
+./build.sh              # Linux, macOS
+powershell -File build.ps1   # Windows
 ```
 
-Produces two things, neither of which needs Godot, a GitHub account, or this repo:
+Both produce this machine's native build plus the browser build, neither of which needs
+Godot, a GitHub account, or this repo:
 
-- `build/UOArena-win64.zip` (~36 MB) — send it however you like. They unzip and
-  double-click `UOArena.exe`. It ships with a plain-English `READ ME FIRST.txt`.
-  Windows only, and unsigned, so SmartScreen shows a "more info → run anyway"
-  click-through.
+- **A native build** — `build/UOArena-linux-x86_64.tar.gz` (~28 MB) or
+  `build/UOArena-win64.zip` (~36 MB). Send it however you like; it ships with a
+  plain-English `READ ME FIRST.txt` covering both platforms. The Windows build is
+  unsigned, so SmartScreen shows a "more info → run anyway" click-through. The Linux
+  build is a tarball rather than a zip so the executable bit survives the trip.
 - `build/web/` — a browser build. Upload the folder to any static host and send the
   link; it plays in a tab on any OS with nothing to install. Exported without thread
   support on purpose, so it works on plain static hosting with no special headers.
+
+`--linux` / `-Windows`, `--web` / `-Web` and `--server` / `-Server` build one target on
+its own. `--server` produces the headless Dedicated Server binary that
+`autoload/network_manager.gd` is written around.
 
 Both are verified working: the exe runs standalone, and in-browser the keyboard
 casting, right-click steering, and cast-while-moving all behave (Godot suppresses the
 browser context menu, so right-click-to-move is safe).
 
 Building needs Godot's export templates for the matching engine version — see the
-header of `build.ps1`.
+header of `build.sh` or `build.ps1` for where they go on each OS.
 
 ## Playing it
 
-```bash
-powershell -File run_game.ps1
+```sh
+./run_game.sh               # Linux, macOS
+powershell -File run_game.ps1    # Windows
 ```
 
-(`-Editor` opens the Godot editor, `-Server` runs headless as a dedicated server, and
-`-Connect <addr>` joins one directly.) With no flags the client opens a join screen;
-**Offline practice** boots `client/scenes/local_test.tscn` — a local, network-free
-harness against a dummy that casts magic arrow at you on a loop. It is the quickest way
-to feel a change, and it needs no server.
+(`--editor` / `-Editor` opens the Godot editor, `--server` / `-Server` runs headless as a
+dedicated server, `--connect <addr>` / `-Connect <addr>` joins one directly, and
+`--port` / `-Port` moves either off the default port.) With no flags the client opens a
+join screen; **Offline practice** boots `client/scenes/local_test.tscn` — a local,
+network-free harness against a dummy that casts magic arrow at you on a loop. It is the
+quickest way to feel a change, and it needs no server.
 
 | Input | |
 | --- | --- |
@@ -161,6 +183,7 @@ to feel a change, and it needs no server.
 | `1`–`5` | magic arrow, poison, lightning, flamestrike, paralyze |
 | left click | pick your target (multiplayer only) |
 | `R` | reset the round (offline practice only) |
+| `M` | mute |
 | `WASD` | keyboard fallback, kept for testing |
 
 The line between you and the dummy is the actual raycast the resolver uses — solid when
@@ -180,8 +203,16 @@ then fizzle into something else while they're already committed to dodging.
 | Flamestrike | `Kal Vas Flam` | 2.5s |
 | Paralyze | `An Ex Por` | 2.5s |
 
-Spells that connect draw a coloured bolt and an impact ring. Spells stopped by cover
-draw nothing at all — in UO a spell with no line simply never goes off.
+Spells that connect draw a coloured bolt and an impact ring, and make a sound. Spells
+stopped by cover do none of those things — in UO a spell with no line simply never goes
+off.
+
+**Listen for the fizzle.** Classic UO magery is ear-driven: you learn to hear a cast
+start, a spell land and a fizzle without watching the caster. The cues are synthesised
+at load rather than shipped as files, and they are told apart by shape — a cast gathers
+upward, a fizzle falls away and sputters, an interrupt is a short hit. This matters most
+for the fizzle, which happens at the exact moment you are watching the sight line and
+your own footing instead of the enemy's feet. `M` mutes.
 
 ## Arena
 
@@ -194,18 +225,30 @@ still standing.
 
 Four cover pieces: two tents flanking the clear centre lane, two rocks in opposite
 corners. The duel opens with a shot available straight down the lane; stepping off it
-puts a tent in the way immediately.
+puts a tent in the way immediately. Tents are drawn as peaked shelters and rocks as
+irregular lumps, so the instruction to "get behind a tent" names something you can pick
+out.
+
+The floor carries a faint grid at one cell per second of movement, which is what turns
+"can I reach that tent before the flamestrike lands" into a distance you can count
+against a cast time rather than estimate.
 
 The scene holds collision bodies only — no sprites — so the client can draw its own view
-and `server/` stays exportable as a Dedicated Server build. Open it in the editor to drag
-cover around; `tests/test_arena_map.gd` will tell you if a change breaks the layout, since
-it asserts cover is reachable within two seconds of movement from *every* spawn, that
-each one has a rotational partner, and that none of them puts you inside a tent.
+and `server/` stays exportable as a Dedicated Server build. What kind of thing a cover
+piece is travels as a node group (`cover_tent`, `cover_rock`), which is plain scene data
+rather than a second copy of the artwork. Open it in the editor to drag cover around, and
+add a piece with any collision shape you like — `ArenaView` draws rectangles, circles,
+capsules and convex polygons, and anything it cannot draw comes out as a loud magenta box
+with a warning rather than as invisible cover. `tests/test_arena_map.gd` will tell you if
+a change breaks the layout, since it asserts cover is reachable within two seconds of
+movement from *every* spawn, that each one has a rotational partner, and that none of
+them puts you inside a tent.
 
 ## Tests
 
-```bash
-powershell -File run_tests.ps1
+```sh
+./run_tests.sh              # Linux, macOS
+powershell -File run_tests.ps1   # Windows
 ```
 
 Headless, no external test framework — `tests/test_main.gd` discovers every

@@ -2,19 +2,35 @@ UO ARENA - quick demo build
 ===========================
 
 TO PLAY
-  Double-click UOArena.exe
 
-  Windows will probably show a blue "Windows protected your PC" box, because
-  this is an unsigned hobby build. Click "More info", then "Run anyway".
+  On Windows
+    Double-click UOArena.exe
 
-  Keep both files in the same folder - the .exe needs the .pck next to it.
+    Windows will probably show a blue "Windows protected your PC" box, because
+    this is an unsigned hobby build. Click "More info", then "Run anyway".
+
+  On Linux
+    Open a terminal in this folder and run:
+
+      chmod +x UOArena.x86_64
+      ./UOArena.x86_64
+
+    (The chmod is only needed once. Some file managers can do it for you under
+    Properties > Permissions > Allow executing file as program.)
+
+  Either way, keep every file in this folder together - the program needs the
+  .pck file next to it.
+
+  Prefer not to download anything at all? The same game runs in a browser at
+  https://sirdeaz.github.io/uo-arena
 
 
 CONTROLS
   Hold RIGHT MOUSE   walk toward the cursor (you can move while casting)
   1 2 3 4 5          magic arrow / poison / lightning / flamestrike / paralyze
   R                  reset the round
-  Alt+F4             quit
+  M                  mute the sound
+  Alt+F4 / Ctrl+Q    quit
 
 
 WHAT AM I LOOKING AT
@@ -24,21 +40,27 @@ WHAT AM I LOOKING AT
   The line between you is the game's actual line-of-sight check. A solid line
   means there is a clear shot; a dashed one means cover is breaking it.
 
+  The faint grid on the ground is one second of running per square, so you can
+  judge whether you will reach that tent before the spell lands.
+
   While someone casts, they speak the spell's words overhead - "Kal Vas Flam"
   is a flamestrike, and it takes 2.5 seconds. That is your warning to get
-  behind a tent.
+  behind a tent. The tents are the peaked ones; the lumpy blocks are rocks.
+  Both stop spells.
 
 
 TRY THIS
   1. Stand still in the open and hold 4. You will get interrupted every time.
-	 Any damage breaks a cast, and there is no refund.
+     Any damage breaks a cast, and there is no refund.
 
   2. Press 4, then immediately press 3. The flamestrike fizzles into a
-	 lightning. Spam it and you will cast nothing at all - that is deliberate,
-	 and it is also how you bait someone into dodging early.
+     lightning. Listen for it - the fizzle is the falling, sputtering sound,
+     and learning to hear it is half of playing this well. Spam it and you
+     will cast nothing at all: that is deliberate, and it is also how you bait
+     someone into dodging early.
 
   3. Walk off the middle lane while the dummy is casting. Watch the line go
-	 dashed and its spells stop landing.
+     dashed and its spells stop landing.
 
 
 This is an early prototype - one arena, one dummy, no multiplayer yet.

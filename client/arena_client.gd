@@ -51,6 +51,7 @@ var _last_event: String = ""
 
 var _sight_line: Node2D
 var _bolts: BoltLayer
+var audio: SpellAudio
 
 var _last_sent_input: Vector2 = Vector2.ZERO
 var _seconds_since_input_sent: float = 0.0
@@ -81,6 +82,9 @@ func _ready() -> void:
 
 	_bolts = BoltLayer.new()
 	add_child(_bolts)
+
+	audio = SpellAudio.new()
+	add_child(audio)
 
 	_build_ui()
 
@@ -171,6 +175,8 @@ func apply_spell_resolved(
 		return
 	if not _fighters.has(caster_peer) or not _fighters.has(target_peer):
 		return
+	# Only a spell that lands makes a sound, the same rule the bolt follows.
+	audio.play(SpellAudio.Cue.IMPACT)
 	_bolts.add_effect(
 		_fighters[caster_peer].position, _fighters[target_peer].position, spell
 	)
@@ -239,6 +245,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:
 		return
+
+	if key.keycode == KEY_M:
+		audio.toggle_muted()
+		return
+
 	if not SPELL_KEYS.has(key.keycode):
 		return
 
@@ -279,11 +290,32 @@ func _add_fighter(peer_id: int, color: Color) -> void:
 	fighter.player_controlled = peer_id == local_peer_id
 	add_child(fighter)
 	_fighters[peer_id] = fighter
+	_connect_audio(fighter)
 
 	if peer_id == local_peer_id:
 		# Bound once, for the life of the connection. Dying moves this fighter rather
 		# than replacing it, precisely so this binding survives a respawn.
 		cast_bar.bind(fighter.combatant.entity_state)
+
+
+## Everyone in the arena is audible, opponents included. A mirrored caster emits the
+## same four signals a local one does — `apply_remote_state` and `emit_remote_event`
+## replay them — so hearing an enemy start a cast, and hearing your own fizzle while you
+## are watching the sight line rather than your feet, needs no networking of its own.
+func _connect_audio(fighter: Fighter) -> void:
+	var state := fighter.combatant.entity_state
+	state.cast_started.connect(
+		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_START)
+	)
+	state.cast_completed.connect(
+		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_RELEASE)
+	)
+	state.cast_fizzled.connect(
+		func(_spell: SpellData, _reason: String) -> void: audio.play(SpellAudio.Cue.FIZZLE)
+	)
+	state.cast_interrupted.connect(
+		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.INTERRUPT)
+	)
 
 
 func _remove_fighter(peer_id: int) -> void:
@@ -328,7 +360,9 @@ func _describe(state: EntityState) -> String:
 
 func _update_hud() -> void:
 	var lines := [
-		"hold RIGHT MOUSE to move    LEFT CLICK a player to target",
+		"hold RIGHT MOUSE to move    LEFT CLICK a player to target    M %s" % (
+			"unmute" if audio.is_muted() else "mute"
+		),
 		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze",
 		"",
 	]

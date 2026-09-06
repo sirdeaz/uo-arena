@@ -1,0 +1,18 @@
+# The repo is LF-clean today by luck rather than by rule. With commits coming from both
+# Windows and Linux that will not stay true on its own, and a .gd file that gains CRLF
+# shows up as a whole-file diff the next time the other machine touches it.
+* text=auto eol=lf
+
+# Binary, byte for byte: normalising these would corrupt them.
+*.ttf   binary
+*.ico   binary
+*.png   binary
+*.wasm  binary
+*.pck   binary
+
+# Shell scripts must keep LF even on Windows checkouts — a CRLF in a #! line makes the
+# script unrunnable on the machine it is meant for.
+*.sh    text eol=lf
+
+# PowerShell is happier with CRLF on the machine that runs it.
+*.ps1   text eol=crlf

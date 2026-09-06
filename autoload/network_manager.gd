@@ -28,8 +28,8 @@ var _connecting_for: float = -1.0
 
 
 func _ready() -> void:
-	if _is_test_run():
-		# The test runner supplies its own scene, so don't route away from it — and
+	if _supplies_its_own_scene():
+		# The caller named the scene it wants to run, so don't route away from it — and
 		# above all don't open a socket.
 		return
 
@@ -51,8 +51,25 @@ func _process(delta: float) -> void:
 # ── Command line ──────────────────────────────────────────────────────────────────
 
 
-func _is_test_run() -> bool:
-	return _has_flag("--test")
+func _supplies_its_own_scene() -> bool:
+	return supplies_its_own_scene(OS.get_cmdline_args(), OS.get_cmdline_user_args())
+
+
+## True when the caller named the scene it wants to run — the test runner, the
+## screenshot tool, or anyone opening a scene directly. Routing away from it would
+## silently swap out the scene they asked for, and the failure looks like the scene
+## never loaded at all rather than like something replaced it.
+##
+## Static and taking its arguments, so a test can exercise it without a command line.
+static func supplies_its_own_scene(
+	args: PackedStringArray, user_args: PackedStringArray
+) -> bool:
+	if "--test" in args or "--test" in user_args:
+		return true
+	for arg in args:
+		if arg.ends_with(".tscn") or arg.ends_with(".scn"):
+			return true
+	return false
 
 
 func _is_server_role() -> bool:

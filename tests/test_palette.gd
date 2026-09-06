@@ -31,6 +31,8 @@ const AXES := {
 		"outline": Palette.OUTLINE,
 		# Deliberately the wall's own slate, and on the same axis as it.
 		"health bar track": Palette.BAR_TRACK,
+		"tent door": Palette.TENT_DOOR,
+		"ground grid": Palette.GRID,
 	},
 	"identity": {
 		"player": Palette.PLAYER,

@@ -9,6 +9,11 @@ class_name SpellVisuals
 ## orange fire read as different materials, not just different hues.
 enum Style { ARC, FLAME }
 
+## The face a caster speaks in. The mantra is diegetic — a character saying the words
+## overhead — so it gets a display face, while the cast bar caption stays in the UI font
+## because that is interface, not speech. Bundled and subset; see `client/fonts/`.
+const MANTRA_FONT: Font = preload("res://client/fonts/UncialAntiqua-Regular.ttf")
+
 const FALLBACK_COLOR := Palette.SPELL_UNKNOWN
 
 const STYLES := {

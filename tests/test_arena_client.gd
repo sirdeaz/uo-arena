@@ -183,3 +183,43 @@ func test_an_unknown_spell_in_a_resolution_is_ignored() -> void:
 	_roster([LOCAL, OTHER])
 	client.apply_spell_resolved(LOCAL, OTHER, 9999, true)
 	assert_eq(client.last_event(), "", "a resolution naming no spell says nothing")
+
+
+# ── Audio ─────────────────────────────────────────────────────────────────────────
+
+
+## The point of the cues is being able to hear a cast you are not looking at, and in
+## multiplayer the cast you are not looking at is somebody else's. Wiring them only into
+## the offline harness would leave the real game silent.
+func test_every_player_in_the_arena_is_audible() -> void:
+	_roster([LOCAL, OTHER])
+	for peer_id in [LOCAL, OTHER]:
+		var state := _fighter(peer_id).combatant.entity_state
+		for signal_name in [
+			"cast_started", "cast_completed", "cast_fizzled", "cast_interrupted"
+		]:
+			assert_true(
+				state.get_signal_connection_list(signal_name).size() > 0,
+				"peer %d's %s reaches nothing that makes a sound" % [peer_id, signal_name]
+			)
+
+
+func test_a_remote_fizzle_is_heard_as_a_fizzle() -> void:
+	# A mirrored caster replays its ending through `emit_remote_event`, which is what
+	# lets the same signal wiring serve local and remote players alike.
+	_roster([LOCAL, OTHER])
+	var heard := []
+	_fighter(OTHER).combatant.entity_state.cast_fizzled.connect(
+		func(_spell: SpellData, _reason: String) -> void: heard.append("fizzle")
+	)
+	client.apply_cast_event(OTHER, EntityState.Event.FIZZLED, SpellBook.IDS.find("flamestrike"))
+	assert_eq(heard.size(), 1, "an opponent's fizzle should reach the audio wiring")
+
+
+func test_muting_the_client_silences_it() -> void:
+	assert_false(client.audio.is_muted(), "sound is on by default")
+	client.audio.set_muted(true)
+	assert_false(
+		client.audio.play(SpellAudio.Cue.FIZZLE),
+		"a muted client should play nothing"
+	)

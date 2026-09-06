@@ -43,6 +43,20 @@ const OUTLINE := Color("#0d1017")
 ## should recede into the scene rather than read as a second, darker bar.
 const BAR_TRACK := WALL
 
+## The mouth of a tent. Darker than anything else on the floor, because the shadowed
+## opening is what makes a peaked shape read as somewhere you could stand behind.
+const TENT_DOOR := Color("#241f18")
+
+## The ground grid: one cell per second of movement, so distance to cover can be counted
+## against a cast time instead of guessed. Drawn at `GRID_ALPHA`, and at
+## `GRID_AXIS_ALPHA` on the two centre lines, which also show the arena's symmetry.
+##
+## Both alphas are deliberately tiny. This is a measuring aid on the backdrop; the moment
+## it competes with the sight line or a bolt it has cost more than it gave.
+const GRID := Color("#39415a")
+const GRID_ALPHA: float = 0.16
+const GRID_AXIS_ALPHA: float = 0.34
+
 
 # ── Identity ──────────────────────────────────────────────────────────────────────
 # Who is who. Blue is you — body, steering cursor, and the fill of your own cast bar,
@@ -159,3 +173,15 @@ const SPELL_PARALYZE := STATUS_PARALYZED
 ## For a spell added without a colour of its own. Deliberately drab: an unstyled spell
 ## should look unfinished rather than quietly pass for a real one.
 const SPELL_UNKNOWN := Color("#d8d8d8")
+
+
+# ── Diagnostic ────────────────────────────────────────────────────────────────────
+
+## Cover that `ArenaView` does not know how to draw, painted as a bounding box so it is
+## visibly there and visibly wrong.
+##
+## Deliberately outside the palette's language rather than part of it. Every other colour
+## here is chosen to sit alongside its neighbours; this one is chosen to clash with all of
+## them, because anything wearing it is a bug and the alternative — cover that blocks
+## spells while drawing nothing — is the worst failure this game has.
+const UNDRAWABLE := Color("#ff00d0")
