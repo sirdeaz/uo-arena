@@ -3,8 +3,10 @@ class_name Palette
 
 ## The art direction, in one place.
 ##
-## Every colour in the game is a `_draw()` argument — there are no textures, sprites or
-## shaders in the repo — so this module *is* the art. Kept in `client/` rather than
+## Every colour a player *reads* is a `_draw()` argument, so this module is the art
+## direction for all of it. Sprites exist now — the fighters wear one — but they carry
+## posture and nothing else; what a colour means is still decided here and only here,
+## and `docs/art-direction.md` draws that line. Kept in `client/` rather than
 ## `common/` for the same reason `SpellVisuals` is: the server resolves spells without
 ## ever needing to know what colour a flamestrike is, and `server/` has to stay free of
 ## rendering concerns so the Dedicated Server export stays clean.
@@ -37,6 +39,8 @@ const UI_BORDER := Color("#3a4050")
 const UI_TEXT := Color("#c8d0e0")
 
 ## Near-black behind overhead text and bars, so they survive any floor under them.
+## Also the shadow a fighter stands in — the same job, one layer down: it is what sets
+## the character off the floor rather than a colour of its own.
 const OUTLINE := Color("#0d1017")
 
 ## The empty part of a health bar. Deliberately the arena's own slate — an unfilled bar
@@ -63,6 +67,16 @@ const GRID_AXIS_ALPHA: float = 0.34
 # which is your cast and so wears your colour.
 
 const PLAYER := Color("#6ec6ff")
+
+## The footing under a fighter: the collision circle, filled as a shadow in `OUTLINE`
+## and rimmed in that fighter's own colour.
+##
+## Every fighter wears the same hooded robe, so this rim is where "which one is that"
+## now lives — the first read of a fight, and the one the sprite cannot make. The
+## shadow is the weaker of the two on purpose: it grounds the character, the rim
+## identifies them.
+const BODY_SHADOW_ALPHA: float = 0.4
+const BODY_RING_ALPHA: float = 0.85
 
 ## The practice dummy, and later the opponent. Rose rather than red: red has one job
 ## here, and it is telling you that you are about to die.
