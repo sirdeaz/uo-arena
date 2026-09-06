@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cldt470mtp84d"
-path="res://.godot/imported/dark_mage.png-02fd94be316cc850b99ebfb6f496fdf9.ctex"
+uid="uid://b67sljwjoxty4"
+path="res://.godot/imported/wizard.png-dff4bda8ef5296bc24b63c444f783ee0.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://client/art/dark_mage.png"
-dest_files=["res://.godot/imported/dark_mage.png-02fd94be316cc850b99ebfb6f496fdf9.ctex"]
+source_file="res://client/art/wizard.png"
+dest_files=["res://.godot/imported/wizard.png-dff4bda8ef5296bc24b63c444f783ee0.ctex"]
 
 [params]
 

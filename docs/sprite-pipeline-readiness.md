@@ -13,6 +13,15 @@ probably right about the world and probably wrong about gameplay state.
 Note the game is already 2D. What is being proposed is replacing procedural `_draw()` with
 authored sprite assets.
 
+> **Update, later the same day.** #26 supplied a four-heading character pack, so the
+> blocker below is gone — a fighter has a heading now. It was answered the cheap way, on
+> purpose: derived from movement client-side, with the local client telling its own
+> fighter who it is casting at so a stationary caster turns to their target. No wire
+> change, no `PROTOCOL_VERSION` bump, and the known cost is stated in **§2** — a *remote*
+> fighter standing still and casting still faces wherever it last walked. That is a
+> visible wrongness in a duel and the reason the protocol answer is deferred rather than
+> dismissed. Nothing else in this assessment changed.
+
 ---
 
 ## What is ready
@@ -66,6 +75,9 @@ keep a developer overlay that draws the true shapes. Several of those 12 tests g
 reframed rather than deleted.
 
 ### 2. The actual blocker — there is no facing direction
+
+*Answered by #26 — see the update at the top. Kept as written, because the trade-off it
+names is the one that was taken and the wire cost is still unpaid.*
 
 `facing`, `rotation`, `look_at`: **zero hits** across `client/`, `server/` and `common/`. A
 fighter is a circle with no orientation.
@@ -122,8 +134,7 @@ Lower risk, keeps the reads, and it is most of the visual win.
 
 Not one job. Each of these is its own issue:
 
-1. **Facing and animation state model** — no art involved. The blocker, and worth doing on
-   its own merits.
+1. ~~**Facing and animation state model**~~ — done in #26, derived client-side.
 2. **Y-sorting**, replacing the flat z-index layers.
 3. **Floor and cover sprites**, collision still authoritative, with a debug overlay.
 4. **Character sprites.**
@@ -133,8 +144,10 @@ Not one job. Each of these is its own issue:
 
 ## Open questions
 
-- Does facing get derived client-side (free, slightly wrong for stationary remote casters)
-  or carried on the wire (correct, costs a protocol bump)?
+- ~~Does facing get derived client-side (free, slightly wrong for stationary remote
+  casters) or carried on the wire (correct, costs a protocol bump)?~~ **Derived
+  client-side**, in #26. Still open in the form the answer left it: whether a remote
+  caster facing the wrong way is worth a 9th record slot.
 - Is the `ArenaView` invariant retired, or kept as a debug overlay?
 - What is the acceptable browser download size? That number decides the art budget more
   than taste does.

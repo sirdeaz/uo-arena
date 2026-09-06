@@ -19,7 +19,7 @@ const HEALTH_BAR_WIDTH: float = 52.0
 ## Top of the character's head, in body coordinates. Everything overhead hangs off
 ## this rather than off `RADIUS`: the sprite is taller than the collision circle, so a
 ## bar placed above the circle would be drawn across the mage's chest.
-const HEAD_TOP: float = -FighterSprite.ANCHOR.y
+const HEAD_TOP: float = -FighterSprite.ANCHORS[FighterSprite.Facing.DOWN].y
 
 ## Gap between the head and the health bar, and between the bar and the mantra above it.
 const OVERHEAD_GAP: float = 6.0
@@ -92,6 +92,19 @@ var _anim_time: float = 0.0
 ## velocity of its own, so reading `velocity` would leave every opponent sliding around
 ## the arena in an idle pose.
 var _travel_speed: float = 0.0
+
+## Which way this fighter is pointing. Derived from where it actually moved rather than
+## from `velocity`, for the same reason `_travel_speed` is: a fighter the server owns
+## has no velocity of its own. It is held rather than reset when a fighter stops, so
+## standing still leaves you facing the way you were last going.
+var _facing: FighterSprite.Facing = FighterSprite.Facing.DOWN
+
+## Who this fighter is casting at, when anyone knows. A caster turns to face their
+## target — standing still and throwing a flamestrike over your shoulder reads as a
+## bug — and only the local client knows its own target, so this is set rather than
+## inferred. Null leaves the heading to movement, which is what every remote fighter
+## falls back to.
+var _aim_at: Variant = null
 var _burst_remaining: float = 0.0
 var _burst_color: Color = Color.WHITE
 var _burst_expands: bool = true
@@ -186,6 +199,7 @@ func _physics_process(delta: float) -> void:
 
 	if delta > 0.0:
 		_travel_speed = was_at.distance_to(global_position) / delta
+	_update_facing(global_position - was_at)
 
 	queue_redraw()
 	_ui.queue_redraw()
@@ -295,7 +309,9 @@ func input_direction() -> Vector2:
 func _draw() -> void:
 	_draw_footing()
 	draw_texture_rect_region(
-		FighterSprite.TEXTURE, FighterSprite.rect_for(Vector2.ZERO), current_frame_region()
+		FighterSprite.TEXTURE,
+		FighterSprite.rect_for(Vector2.ZERO, _facing),
+		current_frame_region()
 	)
 
 
@@ -324,7 +340,30 @@ func current_frame_region() -> Rect2:
 	if anim == FighterSprite.Anim.CAST and state.current_spell != null:
 		progress = state.cast_time_elapsed / state.current_spell.cast_time_seconds
 	return FighterSprite.region_for(
-		anim, FighterSprite.frame_for(anim, _anim_time, progress)
+		FighterSprite.frame_for(anim, _facing, _anim_time, progress)
+	)
+
+
+## Turns this fighter toward whatever it is casting at, or back to its heading of
+## travel. Called by whoever knows the target; `null` gives movement the say again.
+func aim_at(target: Variant) -> void:
+	_aim_at = target
+
+
+## Which way this fighter is pointing. Public so a test can read it without drawing.
+func facing() -> FighterSprite.Facing:
+	return _facing
+
+
+## Hands the frame's facts to `FighterSprite.heading_for` and keeps the answer. The
+## decision itself lives there, where a test can call it without a scene tree.
+func _update_facing(travelled: Vector2) -> void:
+	_facing = FighterSprite.heading_for(
+		combatant.entity_state.current_state == EntityState.State.CASTING,
+		_aim_at,
+		global_position,
+		travelled,
+		_facing
 	)
 
 
