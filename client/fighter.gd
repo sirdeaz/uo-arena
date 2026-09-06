@@ -57,6 +57,15 @@ const REMOTE_RATE: float = 18.0
 ## Where the server last said this fighter is. Ignored while `server_driven` is false.
 var server_position: Vector2 = Vector2.ZERO
 
+## Off by default. Getting yourself around cover is the skill this game is about, so this
+## is an assist you switch on, not the way the game plays.
+var pathfinding_enabled: bool = false
+
+## Set by `enable_pathfinding`. Null on every fighter nobody is steering — a remote body
+## has no cursor to route toward — and null in every test that does not ask for it, which
+## is what makes "off" provably the old code path rather than an equivalent one.
+var _steering: PathSteering = null
+
 var combatant: Combatant
 
 var _fx: Node2D
@@ -163,6 +172,51 @@ func _apply_server_correction(delta: float) -> void:
 	combatant.position = global_position
 
 
+## Gives this fighter a route-finder to steer with. Injected rather than looked up, the
+## same way `CombatResolver` takes its space state as an argument: a fighter has no
+## business knowing how to go and find the arena.
+func enable_pathfinding(finder: PathFinder) -> void:
+	_steering = PathSteering.new(finder)
+
+
+## Flips the assist and reports the new state, mirroring `SpellAudio.toggle_muted`.
+func toggle_pathfinding() -> bool:
+	pathfinding_enabled = not pathfinding_enabled
+	return pathfinding_enabled
+
+
+## The route still to walk, for the debug drawing. Empty whenever steering is straight.
+func steering_path() -> PackedVector2Array:
+	if not pathfinding_enabled or _steering == null:
+		return PackedVector2Array()
+	return _steering.path()
+
+
+## Which way to steer for a cursor at `cursor`, going around cover when the assist is on
+## and the straight line is blocked.
+##
+## The dead zone is applied to the cursor first and the straight line is tried before
+## anything else, so with the assist off — or with nothing in the way — this returns the
+## very same vector the game has always produced, from the very same call.
+##
+## Split out of `input_direction` so it can be exercised without a mouse to simulate.
+func steering_direction_toward(cursor: Vector2) -> Vector2:
+	var straight := movement_direction_toward(global_position, cursor)
+	if straight == Vector2.ZERO:
+		return straight
+	if not pathfinding_enabled or _steering == null:
+		return straight
+
+	var aim := _steering.waypoint_toward(global_position, cursor)
+	if aim == cursor:
+		return straight
+
+	var routed := movement_direction_toward(global_position, aim)
+	# An aim inside the dead zone would stand you still. Walking straight is the worse
+	# route but it is never the wrong answer, so it is what a failure degrades to.
+	return straight if routed == Vector2.ZERO else routed
+
+
 ## Direction to steer in when the cursor is at `target`, or zero inside the dead zone.
 static func movement_direction_toward(from: Vector2, target: Vector2) -> Vector2:
 	var offset := target - from
@@ -177,7 +231,7 @@ static func movement_direction_toward(from: Vector2, target: Vector2) -> Vector2
 func input_direction() -> Vector2:
 	# UO steering: hold the right mouse button and walk toward the cursor.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-		return movement_direction_toward(global_position, get_global_mouse_position())
+		return steering_direction_toward(get_global_mouse_position())
 
 	# WASD kept as a convenience for testing; UO itself has no keyboard movement.
 	var direction := Vector2.ZERO

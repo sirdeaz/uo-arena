@@ -184,7 +184,15 @@ quickest way to feel a change, and it needs no server.
 | left click | pick your target (multiplayer only) |
 | `R` | reset the round (offline practice only) |
 | `M` | mute |
+| `P` | route around cover instead of walking into it (offline practice only) |
 | `WASD` | keyboard fallback, kept for testing |
+
+**`P` is off by default.** With it off, holding right mouse walks straight at the cursor
+and you slide along a tent that gets in the way — which is the game as it has always
+played, and getting yourself around cover is most of the skill in it. With it on, a
+blocked line is routed around the cover instead, and the detour is drawn so you can see
+what it decided. A line that was never blocked steers exactly as it did before, so the
+setting only ever changes what happens when something is actually in the way.
 
 The line between you and the dummy is the actual raycast the resolver uses — solid when
 it has a shot, dashed when cover is breaking it. Stand in the open and the dummy will
