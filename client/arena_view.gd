@@ -14,30 +14,30 @@ class_name ArenaView
 ##    over a dimmed footprint of the rect the raycast uses, so the shape you read and
 ##    the shape that blocks are the same shape.
 
-const FLOOR_COLOR := Color("#1b1f2a")
-const COVER_COLOR := Color("#4a4234")
-const COVER_EDGE := Color("#8a7a5c")
-const WALL_COLOR := Color("#2b2f3a")
+const FLOOR_COLOR := Palette.FLOOR
+const COVER_COLOR := Palette.COVER_FILL
+const COVER_EDGE := Palette.COVER_EDGE
+const WALL_COLOR := Palette.WALL
 
 ## The footprint under a tent or rock: the collision rect, dimmed, so the silhouette can
 ## sit inside it without any part of the real blocker going unpainted.
 const FOOTPRINT_DARKEN := 0.55
 
-const TENT_DOOR_COLOR := Color("#241f18")
+const TENT_DOOR_COLOR := Palette.TENT_DOOR
 
 ## Half-width of the tent's doorway, as a fraction of the tent's width.
 const TENT_DOOR_HALF_WIDTH: float = 0.1
 
 ## Loud on purpose. Anything in this colour is cover the view does not understand.
-const UNSUPPORTED_COLOR := Color("#ff00d0")
+const UNSUPPORTED_COLOR := Palette.UNDRAWABLE
 
 ## Ground grid. One cell is one second of movement at `PLAYER_MOVE_SPEED`, which turns
 ## "can I reach that tent before the flamestrike lands" into a distance you can count
 ## instead of estimate, and makes small movement visible against a fixed reference.
 ## Kept far below the sight line and the bolts in contrast — this is a readability aid,
 ## not decoration.
-const GRID_COLOR := Color("#39415a", 0.16)
-const AXIS_COLOR := Color("#39415a", 0.34)
+const GRID_COLOR := Color(Palette.GRID, Palette.GRID_ALPHA)
+const AXIS_COLOR := Color(Palette.GRID, Palette.GRID_AXIS_ALPHA)
 const GRID_WIDTH: float = 1.0
 
 const CIRCLE_SEGMENTS: int = 24

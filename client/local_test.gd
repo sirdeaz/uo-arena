@@ -18,7 +18,6 @@ const SPELL_KEYS := {
 }
 
 const DUMMY_THINK_SECONDS: float = 0.9
-const EFFECT_SECONDS: float = 0.55
 
 var map: ArenaMap
 var resolver: CombatResolver
@@ -31,13 +30,13 @@ var audio: SpellAudio
 var _dummy_think_timer: float = 0.0
 var _last_event: String = ""
 
-## Brief bolt-and-flash for spells that connected. Blocked spells show nothing at all,
-## matching UO, where a spell you have no line to simply never goes off.
-var _effects: Array[Dictionary] = []
-
 ## Drawn above the arena floor — this node draws itself before its children, so the
 ## sight line has to live on a layer of its own or the floor paints over it.
 var _sight_line: Node2D
+
+## Bolts and impacts for spells that connected. Blocked spells add nothing at all,
+## matching UO, where a spell you have no line to simply never goes off.
+var _bolts: BoltLayer
 
 
 func _ready() -> void:
@@ -60,12 +59,12 @@ func _ready() -> void:
 
 	player = Fighter.new()
 	player.player_controlled = true
-	player.body_color = Color("#6ec6ff")
+	player.body_color = Palette.PLAYER
 	player.position = spawns[0]
 	add_child(player)
 
 	dummy = Fighter.new()
-	dummy.body_color = Color("#e2574c")
+	dummy.body_color = Palette.DUMMY
 	dummy.position = spawns[1]
 	add_child(dummy)
 
@@ -73,6 +72,10 @@ func _ready() -> void:
 	_sight_line.z_index = 5
 	add_child(_sight_line)
 	_sight_line.draw.connect(_draw_sight_line)
+
+	# Spell bolts get their own additive layer so they glow rather than tint.
+	_bolts = BoltLayer.new()
+	add_child(_bolts)
 
 	audio = SpellAudio.new()
 	add_child(audio)
@@ -118,7 +121,7 @@ func _build_ui() -> void:
 
 	hud = Label.new()
 	hud.position = Vector2(24.0, 20.0)
-	hud.add_theme_color_override("font_color", Color("#c8d0e0"))
+	hud.add_theme_color_override("font_color", Palette.UI_TEXT)
 	layer.add_child(hud)
 
 
@@ -133,25 +136,13 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 		# already follow: a blocked spell is silent and invisible, because in UO it
 		# simply never went off.
 		audio.play(SpellAudio.Cue.IMPACT)
-		_effects.append({
-			"from": from.position,
-			"to": to.position,
-			"color": SpellVisuals.color_for(spell),
-			"remaining": EFFECT_SECONDS,
-		})
+		_bolts.add_effect(from.position, to.position, spell)
 
 
 func _process(delta: float) -> void:
 	_run_dummy(delta)
-	_age_effects(delta)
 	_update_hud()
 	_sight_line.queue_redraw()
-
-
-func _age_effects(delta: float) -> void:
-	for effect in _effects:
-		effect["remaining"] -= delta
-	_effects = _effects.filter(func(e: Dictionary) -> bool: return e["remaining"] > 0.0)
 
 
 func _run_dummy(delta: float) -> void:
@@ -164,7 +155,7 @@ func _run_dummy(delta: float) -> void:
 	if _dummy_think_timer < DUMMY_THINK_SECONDS:
 		return
 	_dummy_think_timer = 0.0
-	dummy.combatant.entity_state.try_start_cast(_spell("magic_arrow"))
+	resolver.try_begin_cast(dummy.combatant, player.combatant, _spell("magic_arrow"))
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -185,7 +176,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not player.combatant.is_alive():
 		return
 
-	player.combatant.entity_state.try_start_cast(_spell(SPELL_KEYS[key.keycode]))
+	var spell := _spell(SPELL_KEYS[key.keycode])
+	if not resolver.try_begin_cast(player.combatant, dummy.combatant, spell):
+		if not resolver.can_see(player.combatant, dummy.combatant):
+			_last_event = "%s — no line of sight" % spell.spell_name
 
 
 func _spell(spell_name: String) -> SpellData:
@@ -235,33 +229,36 @@ func _update_hud() -> void:
 
 
 func _draw_sight_line() -> void:
-	# The shot the dummy has on you, drawn exactly as the raycast sees it.
-	var clear := _has_line_of_sight()
-	_sight_line.draw_line(
-		player.position,
-		dummy.position,
-		Color("#7ee081", 0.55) if clear else Color("#e2574c", 0.30),
-		2.0
-	)
-
-	for effect in _effects:
-		var fade: float = effect["remaining"] / EFFECT_SECONDS
-		var color: Color = effect["color"]
-		var from: Vector2 = effect["from"]
-		var to: Vector2 = effect["to"]
-
-		# Bolt: a wide soft trail with a bright core, so it reads even when it lies
-		# along the sight line.
-		_sight_line.draw_line(from, to, Color(color, fade * 0.35), 10.0)
-		_sight_line.draw_line(from, to, Color(color, fade), 3.0)
-
-		# Impact: an expanding ring plus a solid core that fades faster.
-		var radius := 14.0 + (1.0 - fade) * 26.0
-		_sight_line.draw_arc(to, radius, 0.0, TAU, 28, Color(color, fade), 3.0, true)
-		_sight_line.draw_circle(to, radius * 0.55, Color(color, fade * fade * 0.8))
+	# The shot the dummy has on you, drawn exactly as the raycast sees it. Whether the
+	# line is live is a spatial fact, so it is drawn spatially — solid and bright when
+	# there is a shot, dashed and faint when cover has broken it. It used to be
+	# green-versus-red, which meant the two most loaded colours on screen were being
+	# spent here as well as on health, poison and cast feedback.
+	if _has_line_of_sight():
+		_sight_line.draw_line(
+			player.position,
+			dummy.position,
+			Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_CLEAR_ALPHA),
+			2.0
+		)
+	else:
+		_sight_line.draw_dashed_line(
+			player.position,
+			dummy.position,
+			Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_BLOCKED_ALPHA),
+			2.0,
+			Palette.SIGHT_LINE_DASH
+		)
 
 	# Where you are steering, while the move button is down.
+
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		var cursor := _sight_line.get_global_mouse_position()
-		_sight_line.draw_arc(cursor, 9.0, 0.0, TAU, 20, Color("#6ec6ff", 0.7), 2.0, true)
-		_sight_line.draw_line(player.position, cursor, Color("#6ec6ff", 0.22), 1.0)
+		_sight_line.draw_arc(
+			cursor, 9.0, 0.0, TAU, 20,
+			Color(Palette.PLAYER, Palette.STEER_CURSOR_ALPHA), 2.0, true
+		)
+		_sight_line.draw_line(
+			player.position, cursor,
+			Color(Palette.PLAYER, Palette.STEER_LINE_ALPHA), 1.0
+		)

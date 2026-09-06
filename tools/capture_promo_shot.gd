@@ -54,12 +54,13 @@ func _pose(scene: Node2D) -> void:
 	_hold_cast(scene.dummy, "flamestrike", DUMMY_CAST_PROGRESS)
 	_hold_cast(scene.player, "lightning", PLAYER_CAST_PROGRESS)
 
-	scene._effects.append({
-		"from": scene.player.position,
-		"to": scene.dummy.position,
-		"color": SpellVisuals.color_for(load("res://common/spells/lightning.tres")),
-		"remaining": scene.EFFECT_SECONDS * 0.55,
-	})
+	# A bolt in flight, added through the same call the game uses, so the preview cannot
+	# show an effect the game could not produce.
+	scene._bolts.add_effect(
+		scene.player.position,
+		scene.dummy.position,
+		load("res://common/spells/lightning.tres")
+	)
 
 	scene.player.combatant.health = 74.0
 	scene.dummy.combatant.health = 52.0

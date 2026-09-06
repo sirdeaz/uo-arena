@@ -48,6 +48,12 @@ func can_move() -> bool:
 func take_damage(amount: float) -> void:
 	if amount <= 0.0:
 		return
+	# A corpse takes no further hits. Without this, poison carries on ticking a dead
+	# body and re-emits `died` on every tick — which, now that something listens for
+	# `died` in order to schedule a respawn, would queue a fresh respawn every second
+	# until the poison ran out.
+	if not is_alive():
+		return
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health)
 	# Any damage that lands breaks a spell — direct hits and poison ticks alike.
@@ -66,9 +72,39 @@ func apply_paralyze(duration_seconds: float) -> void:
 	paralyze_seconds_remaining = maxf(paralyze_seconds_remaining, duration_seconds)
 
 
-## Advances status timers by `delta`. Driven by the server so that tests (and, later,
-## a fixed server step) can advance time explicitly rather than in real seconds.
+## Stand back up. Full health, nothing lingering, and nothing queued — a respawn is not
+## a fizzle and not an interrupt, so `entity_state.reset()` announces none of them.
+func revive(at: Vector2) -> void:
+	position = at
+	health = Constants.PLAYER_MAX_HEALTH
+	poison_seconds_remaining = 0.0
+	poison_damage_per_tick = 0.0
+	paralyze_seconds_remaining = 0.0
+	_poison_tick_accumulator = 0.0
+	entity_state.reset()
+	health_changed.emit(health)
+
+
+## The authoritative step: one call advances everything this combatant owns. Exactly one
+## thing calls it — the server in a networked match, the fighter itself in the offline
+## harness — and nothing else advances any part of it. Status runs before cast timing so
+## that a poison tick landing this frame interrupts the spell before it can complete.
+func tick(delta: float) -> void:
+	# Time stops for the dead. Without this a corpse keeps running its cast machine, and
+	# anyone who died with a spell queued behind a fizzle would finish casting it.
+	if not is_alive():
+		return
+	tick_status(delta)
+	entity_state.tick(delta)
+
+
+## Advances status timers by `delta`. Driven explicitly rather than from `_process` so
+## that the server can step it at a fixed rate and tests can step exact windows.
 func tick_status(delta: float) -> void:
+	# Nothing burns on the dead. Reviving clears the timers outright.
+	if not is_alive():
+		return
+
 	paralyze_seconds_remaining = maxf(0.0, paralyze_seconds_remaining - delta)
 
 	if poison_seconds_remaining <= 0.0:

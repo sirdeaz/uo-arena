@@ -51,12 +51,30 @@ func test_cast_completes_after_its_cast_time() -> void:
 	assert_eq(state.current_state, EntityState.State.IDLE, "and return to idle")
 
 
-func test_recast_after_the_fizzle_window_is_denied() -> void:
+func test_recast_late_in_a_cast_also_fizzles_and_chains() -> void:
+	# You may abandon a cast at any point, not only in its first moments.
 	state.try_start_cast(_flamestrike())
-	state.tick(1.0)  # well past flamestrike's 0.25s window
-	assert_false(state.try_start_cast(_lightning()), "late recast should be refused")
-	assert_eq(state.current_spell, _flamestrike(), "original spell keeps casting")
-	assert_true(fizzled.is_empty(), "and nothing should fizzle")
+	state.tick(2.0)  # deep into flamestrike's 2.5s cast
+	assert_true(state.try_start_cast(_lightning()), "a late recast is accepted")
+	assert_eq(fizzled.size(), 1, "the abandoned spell fizzles")
+	assert_eq(fizzled[0][0].spell_name, "Flamestrike", "flamestrike is what dies")
+	assert_eq(state.current_state, EntityState.State.RECOVERING, "recovery is still paid")
+
+
+func test_abandoning_a_cast_costs_the_same_whenever_you_do_it() -> void:
+	# Bailing out late must not be cheaper than bailing out early, or the right play
+	# would always be to start a long cast and abort it.
+	state.try_start_cast(_flamestrike())
+	state.tick(2.4)
+	state.try_start_cast(_lightning())
+	state.tick(Constants.GLOBAL_CAST_RECOVERY_SECONDS - 0.01)
+	assert_eq(
+		state.current_state,
+		EntityState.State.RECOVERING,
+		"recovery runs its full length however late the recast was"
+	)
+	state.tick(0.02)
+	assert_eq(state.current_state, EntityState.State.CASTING, "then the chain starts")
 
 
 # ── the fizzle chain ──────────────────────────────────────────────────────────
@@ -67,7 +85,7 @@ func test_recast_inside_the_window_fizzles_the_in_progress_spell() -> void:
 	state.try_start_cast(_lightning())
 	assert_eq(fizzled.size(), 1, "the in-progress spell should fizzle")
 	assert_eq(fizzled[0][0].spell_name, "Flamestrike", "flamestrike is the one that dies")
-	assert_eq(fizzled[0][1], "recast_too_soon", "with the recast reason")
+	assert_eq(fizzled[0][1], "recast", "with the recast reason")
 
 
 func test_recast_inside_the_window_enters_recovery() -> void:
@@ -115,7 +133,7 @@ func test_casting_during_recovery_is_denied() -> void:
 	assert_eq(fizzled.size(), 1, "and the denied press shouldn't fizzle anything extra")
 
 
-func test_spamming_inside_the_window_never_completes_a_spell() -> void:
+func test_spamming_never_completes_a_spell() -> void:
 	# The feint: every press restarts the cycle, so nothing ever resolves.
 	state.try_start_cast(_flamestrike())
 	for i in 5:
@@ -123,6 +141,17 @@ func test_spamming_inside_the_window_never_completes_a_spell() -> void:
 		state.try_start_cast(_lightning())  # denied while recovering, fizzles while casting
 		state.tick(0.25)
 	assert_true(completed_spells.is_empty(), "spam-casting should never land a spell")
+
+
+func test_spamming_late_in_long_casts_still_never_lands() -> void:
+	# Now that a late recast is allowed, check the punishment survives at the other
+	# extreme: pressing just before each cast would have completed.
+	state.try_start_cast(_flamestrike())
+	for i in 4:
+		state.tick(2.4)
+		state.try_start_cast(_flamestrike())
+		state.tick(Constants.GLOBAL_CAST_RECOVERY_SECONDS)
+	assert_true(completed_spells.is_empty(), "aborting at the last moment lands nothing")
 
 
 # ── regressions: transient states must not clobber a new cast ─────────────────

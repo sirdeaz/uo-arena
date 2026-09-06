@@ -34,11 +34,11 @@ CONTROLS
 
 
 WHAT AM I LOOKING AT
-  You are the blue circle on the left. The red one is a practice dummy that
+  You are the blue circle on the left. The pink one is a practice dummy that
   casts magic arrow at you on a loop.
 
-  The line between you is the game's actual line-of-sight check. Green means
-  there is a clear shot; red means cover is breaking it.
+  The line between you is the game's actual line-of-sight check. A solid line
+  means there is a clear shot; a dashed one means cover is breaking it.
 
   The faint grid on the ground is one second of running per square, so you can
   judge whether you will reach that tent before the spell lands.
@@ -59,8 +59,8 @@ TRY THIS
      will cast nothing at all: that is deliberate, and it is also how you bait
      someone into dodging early.
 
-  3. Walk off the middle lane while the dummy is casting. Watch the line turn
-     red and its spells stop landing.
+  3. Walk off the middle lane while the dummy is casting. Watch the line go
+     dashed and its spells stop landing.
 
 
 This is an early prototype - one arena, one dummy, no multiplayer yet.
