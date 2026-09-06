@@ -38,8 +38,7 @@ const INPUT_HEARTBEAT_SECONDS: float = 0.1
 var local_peer_id: int = 0
 
 var map: ArenaMap
-var cast_bar: CastBarUI
-var hud: Label
+var hud: ArenaHud
 
 ## Used for the sight line only. The server does its own raycasting and this one has no
 ## authority over anything — it exists so you can see the shot you are being told about.
@@ -86,22 +85,8 @@ func _ready() -> void:
 	audio = SpellAudio.new()
 	add_child(audio)
 
-	_build_ui()
-
-
-func _build_ui() -> void:
-	var layer := CanvasLayer.new()
-	add_child(layer)
-
-	cast_bar = CastBarUI.new()
-	cast_bar.position = Vector2(24.0, 640.0)
-	cast_bar.size = Vector2(260.0, 16.0)
-	layer.add_child(cast_bar)
-
-	hud = Label.new()
-	hud.position = Vector2(24.0, 20.0)
-	hud.add_theme_color_override("font_color", Palette.UI_TEXT)
-	layer.add_child(hud)
+	hud = ArenaHud.new()
+	add_child(hud)
 
 
 # ── What the server tells us ──────────────────────────────────────────────────────
@@ -295,7 +280,7 @@ func _add_fighter(peer_id: int, color: Color) -> void:
 	if peer_id == local_peer_id:
 		# Bound once, for the life of the connection. Dying moves this fighter rather
 		# than replacing it, precisely so this binding survives a respawn.
-		cast_bar.bind(fighter.combatant.entity_state)
+		hud.bind_cast_bar(fighter.combatant.entity_state)
 
 
 ## Everyone in the arena is audible, opponents included. A mirrored caster emits the
@@ -370,7 +355,7 @@ func _update_hud() -> void:
 	var fighter := _local_fighter()
 	if fighter == null:
 		lines.append("waiting for the arena…")
-		hud.text = "\n".join(lines)
+		hud.set_readout("\n".join(lines))
 		return
 
 	lines.append("you %d — %s" % [
@@ -395,7 +380,7 @@ func _update_hud() -> void:
 		lines.append("")
 		lines.append("you died — back in a few seconds")
 
-	hud.text = "\n".join(lines)
+	hud.set_readout("\n".join(lines))
 
 
 func _draw_sight_line() -> void:
