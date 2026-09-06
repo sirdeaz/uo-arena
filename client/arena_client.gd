@@ -193,8 +193,23 @@ func last_event() -> String:
 
 func _physics_process(delta: float) -> void:
 	_send_input(delta)
+	_update_aim()
 	_update_hud()
 	_sight_line.queue_redraw()
+
+
+## Turns you toward whoever you have selected. Only the local client knows its own
+## target — a snapshot carries positions and state, never intent — so this is set here,
+## and every remote fighter falls back to facing the way it is travelling.
+func _update_aim() -> void:
+	var fighter := _local_fighter()
+	if fighter == null:
+		return
+	if _fighters.has(_target_peer):
+		var target: Fighter = _fighters[_target_peer]
+		fighter.aim_at(target.position)
+	else:
+		fighter.aim_at(null)
 
 
 func _send_input(delta: float) -> void:

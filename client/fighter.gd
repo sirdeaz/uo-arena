@@ -1,7 +1,7 @@
 extends CharacterBody2D
 class_name Fighter
 
-## Client-side body for a combatant: physics, input, and a placeholder drawn shape.
+## Client-side body for a combatant: physics, input, and the character on screen.
 ##
 ## It owns a `Combatant` in all three of its configurations, and what changes between
 ## them is only who advances that combatant's clock and who owns its position:
@@ -15,6 +15,15 @@ class_name Fighter
 
 const RADIUS: float = Constants.PLAYER_RADIUS
 const HEALTH_BAR_WIDTH: float = 52.0
+
+## Top of the character's head, in body coordinates. Everything overhead hangs off
+## this rather than off `RADIUS`: the sprite is taller than the collision circle, so a
+## bar placed above the circle would be drawn across the mage's chest.
+const HEAD_TOP: float = -FighterSprite.ANCHORS[FighterSprite.Facing.DOWN].y
+
+## Gap between the head and the health bar, and between the bar and the mantra above it.
+const OVERHEAD_GAP: float = 6.0
+const MANTRA_GAP: float = 14.0
 
 ## Cursor distance below which holding the move button does nothing. Without it a
 ## cursor resting on your own feet flips direction every frame and you vibrate.
@@ -69,7 +78,33 @@ var _steering: PathSteering = null
 var combatant: Combatant
 
 var _fx: Node2D
+
+## Everything a player *reads* — status rings, health, the mantra — drawn on its own
+## layer above the character. A child rather than part of `_draw` because the sprite
+## has to go underneath all of it, and because this layer wants the engine's default
+## filtering for text while the sprite wants none at all.
+var _ui: Node2D
+
 var _anim_time: float = 0.0
+
+## How fast this body actually moved last frame, which is not the same as `velocity`:
+## a fighter the server owns is carried by `_apply_server_correction` and never has a
+## velocity of its own, so reading `velocity` would leave every opponent sliding around
+## the arena in an idle pose.
+var _travel_speed: float = 0.0
+
+## Which way this fighter is pointing. Derived from where it actually moved rather than
+## from `velocity`, for the same reason `_travel_speed` is: a fighter the server owns
+## has no velocity of its own. It is held rather than reset when a fighter stops, so
+## standing still leaves you facing the way you were last going.
+var _facing: FighterSprite.Facing = FighterSprite.Facing.DOWN
+
+## Who this fighter is casting at, when anyone knows. A caster turns to face their
+## target — standing still and throwing a flamestrike over your shoulder reads as a
+## bug — and only the local client knows its own target, so this is set rather than
+## inferred. Null leaves the heading to movement, which is what every remote fighter
+## falls back to.
+var _aim_at: Variant = null
 var _burst_remaining: float = 0.0
 var _burst_color: Color = Color.WHITE
 var _burst_expands: bool = true
@@ -90,14 +125,32 @@ func _ready() -> void:
 
 	combatant.position = global_position
 
+	# Nearest-neighbour, and only on this node: the character is pixel art, and the
+	# engine's default smoothing turns a 64 px mage into a smear. The overhead text on
+	# `_ui` is deliberately left on the default filter, where it belongs.
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
 	# Spell energy draws on its own additive layer so glow accumulates toward white
 	# instead of flatly tinting the character. Kept at z 0, not below: a negative
 	# z_index would sort it under the arena floor, which then paints over it.
 	_fx = Node2D.new()
+	# Lifted to the character's chest. The aura and the burst are things happening to a
+	# body, so they follow the body up off the floor — unlike the sight line and the
+	# bolts, which stay at the feet because that is where the raycast actually is, and
+	# a drawn line that is not the line being tested is the failure `ArenaView` exists
+	# to avoid.
+	_fx.position = FighterSprite.CHEST
 	_fx.z_index = 0
 	_fx.material = SpellFX.additive_material()
 	add_child(_fx)
 	_fx.draw.connect(_draw_fx)
+
+	# Added last so it draws last. Health, status and the mantra are the reads that
+	# decide fights, and a cast aura is now big enough and high enough to sit right
+	# behind them — so they go over the glow, not under it.
+	_ui = Node2D.new()
+	add_child(_ui)
+	_ui.draw.connect(_draw_ui)
 
 	var state := combatant.entity_state
 	state.cast_completed.connect(
@@ -135,6 +188,8 @@ func _physics_process(delta: float) -> void:
 	if player_controlled and combatant.can_move():
 		direction = input_direction()
 	velocity = direction * Constants.PLAYER_MOVE_SPEED
+
+	var was_at := global_position
 	move_and_slide()
 
 	if server_driven:
@@ -142,7 +197,12 @@ func _physics_process(delta: float) -> void:
 	else:
 		combatant.position = global_position
 
+	if delta > 0.0:
+		_travel_speed = was_at.distance_to(global_position) / delta
+	_update_facing(global_position - was_at)
+
 	queue_redraw()
+	_ui.queue_redraw()
 	_fx.queue_redraw()
 
 
@@ -247,15 +307,74 @@ func input_direction() -> Vector2:
 
 
 func _draw() -> void:
-	draw_circle(Vector2.ZERO, RADIUS, body_color)
-	draw_arc(Vector2.ZERO, RADIUS, 0.0, TAU, 32, body_color.darkened(0.4), 2.0, true)
+	_draw_footing()
+	draw_texture_rect_region(
+		FighterSprite.TEXTURE,
+		FighterSprite.rect_for(Vector2.ZERO, _facing),
+		current_frame_region()
+	)
 
+
+## The mark on the floor the character stands on: the collision circle itself, filled
+## as a shadow and rimmed in this fighter's own colour.
+##
+## The rim is not decoration, it is the identity read, and it is why the circle this
+## replaced could go. Ten fighters wear one hooded robe, so the art cannot say which of
+## them you are looking at; blue-is-you has to survive somewhere, and drawing it at the
+## collision radius keeps `ArenaView`'s bargain besides — the shape you read is still
+## exactly the shape that blocks.
+func _draw_footing() -> void:
+	draw_circle(Vector2.ZERO, RADIUS, Color(Palette.OUTLINE, Palette.BODY_SHADOW_ALPHA))
+	draw_arc(
+		Vector2.ZERO, RADIUS, 0.0, TAU, 32,
+		Color(body_color, Palette.BODY_RING_ALPHA), 2.0, true
+	)
+
+
+## Which patch of the atlas this fighter is showing right now. Public so the practice
+## harness and the tests can ask without waiting for a frame to be drawn.
+func current_frame_region() -> Rect2:
+	var state := combatant.entity_state
+	var anim := FighterSprite.animation_for(state.current_state, _travel_speed)
+	var progress := 0.0
+	if anim == FighterSprite.Anim.CAST and state.current_spell != null:
+		progress = state.cast_time_elapsed / state.current_spell.cast_time_seconds
+	return FighterSprite.region_for(
+		FighterSprite.frame_for(anim, _facing, _anim_time, progress)
+	)
+
+
+## Turns this fighter toward whatever it is casting at, or back to its heading of
+## travel. Called by whoever knows the target; `null` gives movement the say again.
+func aim_at(target: Variant) -> void:
+	_aim_at = target
+
+
+## Which way this fighter is pointing. Public so a test can read it without drawing.
+func facing() -> FighterSprite.Facing:
+	return _facing
+
+
+## Hands the frame's facts to `FighterSprite.heading_for` and keeps the answer. The
+## decision itself lives there, where a test can call it without a scene tree.
+func _update_facing(travelled: Vector2) -> void:
+	_facing = FighterSprite.heading_for(
+		combatant.entity_state.current_state == EntityState.State.CASTING,
+		_aim_at,
+		global_position,
+		travelled,
+		_facing
+	)
+
+
+## Status, health and speech, above the character rather than on it.
+func _draw_ui() -> void:
 	if combatant.is_paralyzed():
-		draw_arc(
+		_ui.draw_arc(
 			Vector2.ZERO, RADIUS + 7.0, 0.0, TAU, 32, Palette.STATUS_PARALYZED, 3.0, true
 		)
 	if combatant.poison_seconds_remaining > 0.0:
-		draw_arc(
+		_ui.draw_arc(
 			Vector2.ZERO, RADIUS + 13.0, 0.0, TAU, 32, Palette.STATUS_POISONED, 2.0, true
 		)
 
@@ -341,28 +460,28 @@ func _draw_mantra() -> void:
 	var font := SpellVisuals.MANTRA_FONT
 	var text: String = state.current_spell.mantra
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE).x
-	var origin := Vector2(-width * 0.5, -RADIUS - 30.0)
+	var origin := Vector2(-width * 0.5, HEAD_TOP - OVERHEAD_GAP - MANTRA_GAP)
 
 	# Dark outline so the words stay readable over the arena floor. One call rather than
 	# the four offset passes this used to take.
-	draw_string_outline(
+	_ui.draw_string_outline(
 		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE,
 		MANTRA_OUTLINE_SIZE, Palette.OUTLINE
 	)
-	draw_string(
+	_ui.draw_string(
 		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE, MANTRA_COLOR
 	)
 
 
 func _draw_health_bar() -> void:
 	var fraction := clampf(combatant.health / Constants.PLAYER_MAX_HEALTH, 0.0, 1.0)
-	var origin := Vector2(-HEALTH_BAR_WIDTH * 0.5, -RADIUS - 18.0)
-	draw_rect(Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.BAR_TRACK)
-	draw_rect(
+	var origin := Vector2(-HEALTH_BAR_WIDTH * 0.5, HEAD_TOP - OVERHEAD_GAP)
+	_ui.draw_rect(Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.BAR_TRACK)
+	_ui.draw_rect(
 		Rect2(origin, Vector2(HEALTH_BAR_WIDTH * fraction, 6.0)),
 		Palette.HEALTH_HURT if fraction < Palette.HEALTH_HURT_FRACTION \
 			else Palette.HEALTH_HEALTHY
 	)
-	draw_rect(
+	_ui.draw_rect(
 		Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.OUTLINE, false, 1.0
 	)
