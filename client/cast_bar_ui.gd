@@ -29,6 +29,15 @@ func bind(state: EntityState) -> void:
 	state.cast_interrupted.connect(_on_cast_interrupted)
 
 
+## Whose cast this bar is showing, or null before anything has bound it.
+##
+## Exists so a test can tell a bar that was bound from one that only looks bound. The
+## difference is invisible on screen — an unbound bar and an idle one both draw nothing —
+## which is what let a dead cast bar reach multiplayer unnoticed in the first place.
+func bound_state() -> EntityState:
+	return _state
+
+
 func _process(delta: float) -> void:
 	_flash_remaining = maxf(0.0, _flash_remaining - delta)
 	queue_redraw()

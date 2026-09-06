@@ -24,8 +24,7 @@ var map: ArenaMap
 var resolver: CombatResolver
 var player: Fighter
 var dummy: Fighter
-var cast_bar: CastBarUI
-var hud: Label
+var hud: ArenaHud
 var audio: SpellAudio
 
 var _dummy_think_timer: float = 0.0
@@ -92,7 +91,9 @@ func _ready() -> void:
 	_connect_combat(player, dummy)
 	_connect_combat(dummy, player)
 
-	_build_ui()
+	hud = ArenaHud.new()
+	add_child(hud)
+	hud.bind_cast_bar(player.combatant.entity_state)
 
 
 ## Both fighters are audible. Hearing the enemy start a cast is the read the mantras
@@ -114,22 +115,6 @@ func _connect_combat(from: Fighter, to: Fighter) -> void:
 	from.combatant.entity_state.cast_completed.connect(
 		func(spell: SpellData) -> void: _on_cast_completed(from, to, spell)
 	)
-
-
-func _build_ui() -> void:
-	var layer := CanvasLayer.new()
-	add_child(layer)
-
-	cast_bar = CastBarUI.new()
-	cast_bar.position = Vector2(24.0, 640.0)
-	cast_bar.size = Vector2(260.0, 16.0)
-	layer.add_child(cast_bar)
-	cast_bar.bind(player.combatant.entity_state)
-
-	hud = Label.new()
-	hud.position = Vector2(24.0, 20.0)
-	hud.add_theme_color_override("font_color", Palette.UI_TEXT)
-	layer.add_child(hud)
 
 
 func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
@@ -239,7 +224,7 @@ func _update_hud() -> void:
 		lines.append("")
 		lines.append("dummy down — R to reset")
 
-	hud.text = "\n".join(lines)
+	hud.set_readout("\n".join(lines))
 
 
 func _draw_sight_line() -> void:
