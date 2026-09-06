@@ -44,6 +44,12 @@ done
 godot=$(find_godot)
 require_godot_4 "$godot"
 
+# Keeps global class names (ArenaServer, NetProtocol, ...) registered after new scripts
+# land, the way run_tests.sh and build.sh already do. Without it, launching straight
+# after a pull that added a class_name dies on parse errors in the autoloads. The editor
+# rescans the filesystem when it opens, so it is the one path that does not need this.
+[ "$editor" -eq 1 ] || import_project "$godot"
+
 # Everything after `--` is passed through to the game rather than the engine.
 set --
 [ -n "$port" ] && set -- "$@" --port "$port"
