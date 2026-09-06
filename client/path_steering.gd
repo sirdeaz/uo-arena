@@ -22,6 +22,21 @@ const REPLAN_INTERVAL_TICKS: int = 6
 ## was solved — the character would wobble on the spot instead of setting off.
 const HYSTERESIS: float = 0.85
 
+## How close is close enough to call a waypoint reached.
+##
+## Borrowed rather than tuned, and this is the one number it can honestly be. A waypoint
+## sits `PLAYER_RADIUS + CLEARANCE_MARGIN` out from each face of the corner it rounds, so
+## a body whose centre is within `CLEARANCE_MARGIN` of it is still a full `PLAYER_RADIUS`
+## clear of both — which is to say retiring the corner from here cuts across nothing. Any
+## wider and it does: at the player's own radius, crossings that were clean start rubbing
+## along the cover they are going round.
+##
+## The floor is half a step, not this. A walker that steps `s` per tick and is more than
+## `s/2` from a point cannot straddle it forever — it lands within the radius on the way
+## past — and `tests/test_corner_rounding.gd` pins that this stays true of the numbers
+## these two constants actually hold.
+const ARRIVAL_RADIUS: float = PathFinder.CLEARANCE_MARGIN
+
 ## Counts solves, so a test can show the throttle actually throttles.
 var plans_run: int = 0
 
@@ -108,6 +123,9 @@ func _should_replan(from: Vector2, cursor: Vector2) -> bool:
 ## straight for that instead. That is what a person does, and it is what removes the
 ## pivoting you would otherwise get every time you arrived at a corner dead on. The index
 ## only moves forward, so a route can never send you back to a corner already rounded.
+##
+## A corner you are standing on is retired even when nothing past it is in sight yet, so
+## that an aim can never come back with no direction in it.
 func _skip_ahead(from: Vector2) -> Vector2:
 	for i in range(_path.size() - 1, _index, -1):
 		if _finder.segment_is_walkable(from, _path[i]):
@@ -117,6 +135,19 @@ func _skip_ahead(from: Vector2) -> Vector2:
 	# Nothing beyond the current corner is in sight, so the corner is still the way out.
 	# Being close to it is not a reason to look past it — a corner you have not rounded
 	# yet is exactly the one that is still in the way.
+	#
+	# Standing *on* it is a different question, and the one the loop above cannot answer.
+	# A walker cannot land on a point exactly: it steps past, turns round, steps back past,
+	# and the aim never changes because the next corner is still out of sight from either
+	# side of it. Held long enough, that is a stall as complete as the one the dead zone
+	# used to cause — and if a step ever does land dead on, the aim has no length in it and
+	# `_aim_for` hands back the cursor, which is the line through the cover this route
+	# exists to avoid.
+	#
+	# So a corner close enough to be straddled is a corner rounded. The clearance margin
+	# already put it clear of both faces, which is what makes that safe to say.
+	while _index < _path.size() - 1 and from.distance_to(_path[_index]) <= ARRIVAL_RADIUS:
+		_index += 1
 	return _path[_index]
 
 

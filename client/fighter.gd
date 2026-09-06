@@ -27,7 +27,16 @@ const MANTRA_GAP: float = 14.0
 
 ## Cursor distance below which holding the move button does nothing. Without it a
 ## cursor resting on your own feet flips direction every frame and you vibrate.
+##
+## It belongs to the cursor and to nothing else. A routed waypoint is not a cursor — see
+## `WAYPOINT_EPSILON` and `steering_direction_toward` for why applying this to one parked
+## the character on every corner in the arena.
 const MOUSE_DEAD_ZONE: float = 16.0
+
+## How close an aim has to be before there is no direction left in it. Sub-pixel, because
+## unlike the cursor a waypoint is somewhere you are going: fifteen pixels short of a
+## corner is mid-walk, not a request to stand still.
+const WAYPOINT_EPSILON: float = 0.01
 
 const MANTRA_COLOR := Palette.MANTRA
 const MANTRA_FONT_SIZE: int = 16
@@ -271,9 +280,10 @@ func steering_direction_toward(cursor: Vector2) -> Vector2:
 	if aim == cursor:
 		return straight
 
-	var routed := movement_direction_toward(global_position, aim)
-	# An aim inside the dead zone would stand you still. Walking straight is the worse
-	# route but it is never the wrong answer, so it is what a failure degrades to.
+	var routed := waypoint_direction_toward(global_position, aim)
+	# Only a genuinely degenerate aim gets here now — a waypoint under your own feet.
+	# Walking straight is the worse route but it is never the wrong answer, so it is what
+	# a failure degrades to.
 	return straight if routed == Vector2.ZERO else routed
 
 
@@ -281,6 +291,24 @@ func steering_direction_toward(cursor: Vector2) -> Vector2:
 static func movement_direction_toward(from: Vector2, target: Vector2) -> Vector2:
 	var offset := target - from
 	if offset.length() <= MOUSE_DEAD_ZONE:
+		return Vector2.ZERO
+	return offset.normalized()
+
+
+## Direction to steer in toward a routed waypoint at `target`. The same normalise, with
+## the cursor's dead zone replaced by a sub-pixel one.
+##
+## The distinction is the whole of issue #28. Cover is inflated by `PLAYER_RADIUS +
+## CLEARANCE_MARGIN`, so a mitred right-angled corner puts the waypoint 22·√2 = 31.1px
+## out from the real corner — and an 18px body cannot stand closer than 18px to it. That
+## leaves a 2.9px band the body can reach where a 16px dead zone had already given up,
+## and giving up means steering straight at the cursor, which is the line through the
+## tent. The tent pushes you back out, the aim flips, and you stand there vibrating.
+## Every cover piece and wall in the arena is an axis-aligned rectangle, so that was all
+## 24 corners in the visibility graph.
+static func waypoint_direction_toward(from: Vector2, target: Vector2) -> Vector2:
+	var offset := target - from
+	if offset.length() <= WAYPOINT_EPSILON:
 		return Vector2.ZERO
 	return offset.normalized()
 

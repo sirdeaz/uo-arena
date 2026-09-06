@@ -38,9 +38,54 @@ func test_just_outside_the_dead_zone_does_move_you() -> void:
 	assert_almost_eq(direction.x, 1.0, "past the dead zone you should walk normally")
 
 
+# ── A waypoint is not a cursor ────────────────────────────────────────────────────
+# The dead zone above exists for a cursor resting on your own feet. Issue #28 is what
+# happened when a routed waypoint was put through it as well.
+
+
+func test_a_waypoint_inside_the_cursor_dead_zone_still_moves_you() -> void:
+	# The bug, in one call. Cover is inflated with a mitred join, so the waypoint on a
+	# right-angled corner sits 31.1px out from the real corner while an 18px body cannot
+	# stand closer than 18px to it — leaving a band the body reaches and the 16px dead
+	# zone had already written off. Writing it off meant steering straight at the cursor,
+	# which is the line through the tent.
+	var waypoint := Vector2(Fighter.MOUSE_DEAD_ZONE - 1.0, 0.0)
+	assert_eq(
+		Fighter.movement_direction_toward(Vector2.ZERO, waypoint),
+		Vector2.ZERO,
+		"the cursor's dead zone is unchanged, and this is what it does"
+	)
+	assert_almost_eq(
+		Fighter.waypoint_direction_toward(Vector2.ZERO, waypoint).x,
+		1.0,
+		"but fifteen pixels short of a corner is mid-walk, not a request to stand still"
+	)
+
+
+func test_a_waypoint_under_your_own_feet_still_does_not_move_you() -> void:
+	# The one case that does degrade: a zero-length offset cannot be normalised, and
+	# `steering_direction_toward` falls back to the straight line when this happens.
+	assert_eq(
+		Fighter.waypoint_direction_toward(Vector2(50.0, 50.0), Vector2(50.0, 50.0)),
+		Vector2.ZERO,
+		"an aim with no length in it is not a direction"
+	)
+
+
+func test_a_waypoint_far_off_steers_exactly_as_the_cursor_would() -> void:
+	# Past both thresholds the two are the same normalise, so routing cannot introduce a
+	# difference in feel anywhere except the last few pixels of a corner.
+	assert_eq(
+		Fighter.waypoint_direction_toward(Vector2(-40.0, 10.0), Vector2(300.0, -80.0)),
+		Fighter.movement_direction_toward(Vector2(-40.0, 10.0), Vector2(300.0, -80.0)),
+		"the two must only disagree inside the cursor's dead zone"
+	)
+
+
 # ── Pathfinding ───────────────────────────────────────────────────────────────────
-# The six tests above are deliberately untouched: they pin the straight-line contract,
-# and their still passing is what says the assist changed nothing underneath it.
+# The six dead-zone tests at the top of this file are deliberately untouched: they pin the
+# straight-line contract, and their still passing is what says the assist changed nothing
+# underneath it.
 
 
 var _map: ArenaMap
