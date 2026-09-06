@@ -30,6 +30,7 @@ CONTROLS
   1 2 3 4 5          magic arrow / poison / lightning / flamestrike / paralyze
   R                  reset the round
   M                  mute the sound
+  P                  walk around cover instead of into it (see below)
   Alt+F4 / Ctrl+Q    quit
 
 
@@ -47,6 +48,12 @@ WHAT AM I LOOKING AT
   is a flamestrike, and it takes 2.5 seconds. That is your warning to get
   behind a tent. The tents are the peaked ones; the lumpy blocks are rocks.
   Both stop spells.
+
+  Normally you walk in a straight line at the cursor, so aiming at a spot
+  behind a tent walks you into the tent. Press P and the game works out a way
+  around it instead, and draws the route it picked. It is off to start with,
+  because steering around cover yourself is most of the skill here - but it is
+  worth a try while you are learning the map.
 
 
 TRY THIS

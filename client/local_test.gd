@@ -4,10 +4,11 @@ extends Node2D
 ## (`Combatant`, `CombatResolver`, `ArenaMap`) in-process so cover-dodging, fizzling
 ## and interrupts can be felt before any of it goes over the wire.
 ##
-##   WASD    move
-##   1-5     magic arrow / poison / lightning / flamestrike / paralyze
-##   R       reset the round
-##   M       mute
+##   RIGHT MOUSE  walk toward the cursor (WASD also works, for testing)
+##   1-5          magic arrow / poison / lightning / flamestrike / paralyze
+##   R            reset the round
+##   M            mute
+##   P            route around cover instead of walking into it
 
 const SPELL_KEYS := {
 	KEY_1: "magic_arrow",
@@ -62,6 +63,12 @@ func _ready() -> void:
 	player.body_color = Palette.PLAYER
 	player.position = spawns[0]
 	add_child(player)
+
+	# Built once from the map that was just added — the arena's geometry is fixed at load
+	# and nothing ever moves it. Off until you press P.
+	var finder := PathFinder.new()
+	finder.build(map)
+	player.enable_pathfinding(finder)
 
 	dummy = Fighter.new()
 	dummy.body_color = Palette.DUMMY
@@ -171,6 +178,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		audio.toggle_muted()
 		return
 
+	if key.keycode == KEY_P:
+		_last_event = "pathing %s" % ("ON" if player.toggle_pathfinding() else "OFF")
+		return
+
 	if not SPELL_KEYS.has(key.keycode):
 		return
 	if not player.combatant.is_alive():
@@ -204,9 +215,12 @@ func _update_hud() -> void:
 	var status := _describe(player.combatant.entity_state)
 
 	var lines := [
-		"hold RIGHT MOUSE to move toward the cursor    R reset    M %s" % (
-			"unmute" if audio.is_muted() else "mute"
-		),
+		"hold RIGHT MOUSE to move toward the cursor    R reset    M %s    P pathing %s" % [
+			"unmute" if audio.is_muted() else "mute",
+			# The state, not the action — unlike M, whose effect you can hear. A mode you
+			# can only see the consequences of should say which way it is set.
+			"ON" if player.pathfinding_enabled else "OFF",
+		],
 		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze",
 		"",
 		"you %d    dummy %d" % [
@@ -261,4 +275,33 @@ func _draw_sight_line() -> void:
 		_sight_line.draw_line(
 			player.position, cursor,
 			Color(Palette.PLAYER, Palette.STEER_LINE_ALPHA), 1.0
+		)
+		_draw_route()
+
+
+## The route being walked, when pathfinding is the one steering. With the assist off, or
+## with a clear line to the cursor, there is no route and this draws nothing — so the
+## straight steer line above is the whole picture, exactly as it was before.
+func _draw_route() -> void:
+	var route := player.steering_path()
+	if route.is_empty():
+		return
+
+	# The leg being walked right now, brighter than the straight line it replaces.
+	_sight_line.draw_line(
+		player.position, route[0],
+		Color(Palette.PLAYER, Palette.PATH_LINE_ALPHA), 2.0
+	)
+
+	for i in range(1, route.size()):
+		_sight_line.draw_dashed_line(
+			route[i - 1], route[i],
+			Color(Palette.PLAYER, Palette.PATH_WAYPOINT_ALPHA), 1.0, Palette.PATH_DASH
+		)
+
+	# A ring on each corner still to be rounded, so the shape of the detour is legible.
+	for i in route.size() - 1:
+		_sight_line.draw_arc(
+			route[i], 5.0, 0.0, TAU, 12,
+			Color(Palette.PLAYER, Palette.PATH_WAYPOINT_ALPHA), 1.0, true
 		)

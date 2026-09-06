@@ -155,6 +155,14 @@ const SIGHT_LINE_DASH: float = 9.0
 const STEER_LINE_ALPHA: float = 0.22
 const STEER_CURSOR_ALPHA: float = 0.7
 
+## The route, when pathfinding is doing the steering. No new colour: this is the steer
+## line, bent around cover — the same intent, so the same blue. The leg you are actually
+## walking is drawn brighter than the straight line, because it is the part being acted
+## on rather than merely aimed at.
+const PATH_LINE_ALPHA: float = 0.5
+const PATH_WAYPOINT_ALPHA: float = 0.45
+const PATH_DASH: float = 6.0
+
 
 # ── Spells ────────────────────────────────────────────────────────────────────────
 # The bolt, the charging aura and the impact ring of each spell. Distinctness here is
