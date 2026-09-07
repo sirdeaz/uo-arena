@@ -69,3 +69,34 @@ func test_lookup_by_name_matches_lookup_by_id() -> void:
 		"the two lookups must agree"
 	)
 	assert_eq(SpellBook.by_name("summon_daemon"), null, "an unknown stem is null")
+
+
+# ── Number-row hotkeys ────────────────────────────────────────────────────────────
+# The keys are matched on `physical_keycode`, not `keycode`, so the number row begins
+# the same spells on every layout. On AZERTY, `keycode` reported `& é " ' (` and four
+# of the five keys never matched — see the issue this file's `spell_id_for_hotkey`
+# closes.
+
+
+func test_the_number_row_maps_to_the_first_five_spells_in_order() -> void:
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_1), 0, "1 begins magic arrow")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_2), 1, "2 begins poison")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_3), 2, "3 begins lightning")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_4), 3, "4 begins flamestrike")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_5), 4, "5 begins paralyze")
+
+
+func test_every_hotkey_resolves_to_a_real_spell() -> void:
+	# Guards a rename in HOTKEY_STEMS drifting from IDS: a stem with no id would hand a
+	# pressed key a -1 and silently do nothing, which is the bug all over again.
+	for physical_keycode in SpellBook.HOTKEY_STEMS:
+		var id := SpellBook.spell_id_for_hotkey(physical_keycode)
+		assert_true(id >= 0, "%s maps to a stem with no wire id" % physical_keycode)
+		assert_true(SpellBook.spell_for(id) != null, "%s names no spell" % physical_keycode)
+
+
+func test_a_key_off_the_number_row_is_not_a_hotkey() -> void:
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_0), -1, "0 is not a spell key")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_6), -1, "there is no sixth spell")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_A), -1, "a letter is not a spell key")
+	assert_eq(SpellBook.spell_id_for_hotkey(0), -1, "an unreported physical keycode is not a hotkey")
