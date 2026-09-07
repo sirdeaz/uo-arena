@@ -26,6 +26,10 @@ const TARGET_PICK_RADIUS: float = 44.0
 ## packet that says "I let go of the button" is exactly the one that can go missing.
 const INPUT_HEARTBEAT_SECONDS: float = 0.1
 
+## A scene rather than `Fighter.new()` so the character atlas comes wired from
+## `client/art/wizard.tres` and can be swapped in the editor.
+const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
+
 ## Which peer this client is playing. Set before adding the node to the tree.
 var local_peer_id: int = 0
 
@@ -275,7 +279,7 @@ func _color_for(peer_id: int, slot: int) -> Color:
 
 
 func _add_fighter(peer_id: int, color: Color) -> void:
-	var fighter := Fighter.new()
+	var fighter: Fighter = FIGHTER_SCENE.instantiate()
 	fighter.body_color = color
 	fighter.server_driven = true
 	fighter.player_controlled = peer_id == local_peer_id

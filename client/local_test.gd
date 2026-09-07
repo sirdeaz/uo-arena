@@ -12,6 +12,10 @@ extends Node2D
 
 const DUMMY_THINK_SECONDS: float = 0.9
 
+## A scene rather than `Fighter.new()` so the character atlas comes wired from
+## `client/art/wizard.tres` and can be swapped in the editor.
+const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
+
 var map: ArenaMap
 var resolver: CombatResolver
 var player: Fighter
@@ -49,7 +53,7 @@ func _ready() -> void:
 
 	var spawns := map.get_spawn_positions()
 
-	player = Fighter.new()
+	player = FIGHTER_SCENE.instantiate()
 	player.player_controlled = true
 	player.body_color = Palette.PLAYER
 	player.position = spawns[0]
@@ -61,7 +65,7 @@ func _ready() -> void:
 	finder.build(map)
 	player.enable_pathfinding(finder)
 
-	dummy = Fighter.new()
+	dummy = FIGHTER_SCENE.instantiate()
 	dummy.body_color = Palette.DUMMY
 	dummy.position = spawns[1]
 	add_child(dummy)

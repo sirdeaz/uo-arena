@@ -18,8 +18,9 @@ const HEALTH_BAR_WIDTH: float = 52.0
 
 ## Top of the character's head, in body coordinates. Everything overhead hangs off
 ## this rather than off `RADIUS`: the sprite is taller than the collision circle, so a
-## bar placed above the circle would be drawn across the mage's chest.
-const HEAD_TOP: float = -FighterSprite.ANCHORS[FighterSprite.Facing.DOWN].y
+## bar placed above the circle would be drawn across the mage's chest. Read off `sprite`
+## in `_ready` rather than a `const`, now that the atlas geometry lives in a resource.
+var _head_top: float = 0.0
 
 ## Gap between the head and the health bar, and between the bar and the mantra above it.
 const OVERHEAD_GAP: float = 6.0
@@ -66,6 +67,12 @@ const REMOTE_RATE: float = 18.0
 
 @export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
+
+## The character atlas and its frame table. A resource so the art is swapped in the
+## editor rather than in code — `client/scenes/fighter.tscn` names `client/art/wizard.tres`
+## here. Left assignable rather than hard-wired so a bare `Fighter.new()` in a test still
+## gets the default, which `_ready` loads when this is null.
+@export var sprite: FighterSprite
 
 ## True when this body is a view of a combatant the server owns. It then advances no
 ## timers of its own — health, status and cast state are written from snapshots — and
@@ -120,6 +127,12 @@ var _burst_expands: bool = true
 
 
 func _ready() -> void:
+	# A bare `Fighter.new()` — the movement and corner-rounding tests still make one —
+	# comes in with no sprite. The scene wires the real resource; this is the fallback.
+	if sprite == null:
+		sprite = load("res://client/art/wizard.tres")
+	_head_top = sprite.head_top()
+
 	combatant = Combatant.new()
 	add_child(combatant)
 
@@ -148,7 +161,7 @@ func _ready() -> void:
 	# bolts, which stay at the feet because that is where the raycast actually is, and
 	# a drawn line that is not the line being tested is the failure `ArenaView` exists
 	# to avoid.
-	_fx.position = FighterSprite.CHEST
+	_fx.position = sprite.chest
 	_fx.z_index = 0
 	_fx.material = SpellFX.additive_material()
 	add_child(_fx)
@@ -337,8 +350,8 @@ func input_direction() -> Vector2:
 func _draw() -> void:
 	_draw_footing()
 	draw_texture_rect_region(
-		FighterSprite.TEXTURE,
-		FighterSprite.rect_for(Vector2.ZERO, _facing),
+		sprite.texture,
+		sprite.rect_for(Vector2.ZERO, _facing),
 		current_frame_region()
 	)
 
@@ -367,8 +380,8 @@ func current_frame_region() -> Rect2:
 	var progress := 0.0
 	if anim == FighterSprite.Anim.CAST and state.current_spell != null:
 		progress = state.cast_time_elapsed / state.current_spell.cast_time_seconds
-	return FighterSprite.region_for(
-		FighterSprite.frame_for(anim, _facing, _anim_time, progress)
+	return sprite.region_for(
+		sprite.frame_for(anim, _facing, _anim_time, progress)
 	)
 
 
@@ -488,7 +501,7 @@ func _draw_mantra() -> void:
 	var font := SpellVisuals.MANTRA_FONT
 	var text: String = state.current_spell.mantra
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE).x
-	var origin := Vector2(-width * 0.5, HEAD_TOP - OVERHEAD_GAP - MANTRA_GAP)
+	var origin := Vector2(-width * 0.5, _head_top - OVERHEAD_GAP - MANTRA_GAP)
 
 	# Dark outline so the words stay readable over the arena floor. One call rather than
 	# the four offset passes this used to take.
@@ -503,7 +516,7 @@ func _draw_mantra() -> void:
 
 func _draw_health_bar() -> void:
 	var fraction := clampf(combatant.health / Constants.PLAYER_MAX_HEALTH, 0.0, 1.0)
-	var origin := Vector2(-HEALTH_BAR_WIDTH * 0.5, HEAD_TOP - OVERHEAD_GAP)
+	var origin := Vector2(-HEALTH_BAR_WIDTH * 0.5, _head_top - OVERHEAD_GAP)
 	_ui.draw_rect(Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.BAR_TRACK)
 	_ui.draw_rect(
 		Rect2(origin, Vector2(HEALTH_BAR_WIDTH * fraction, 6.0)),
