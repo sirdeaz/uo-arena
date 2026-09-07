@@ -1,7 +1,9 @@
 extends Resource
 class_name SpellData
 
-enum EffectType { DAMAGE, POISON, PARALYZE }
+## Append only. `poison.tres` and `paralyze.tres` store their effect as a bare int
+## (`1`, `2`), so inserting a value anywhere but the end silently repoints them.
+enum EffectType { DAMAGE, POISON, PARALYZE, CURE }
 
 @export var spell_name: String = ""
 ## Words spoken overhead while casting. This is the opponent's only warning of what is
@@ -17,3 +19,12 @@ enum EffectType { DAMAGE, POISON, PARALYZE }
 @export var effect_type: EffectType = EffectType.DAMAGE
 @export var effect_duration_seconds: float = 0.0  # used for poison/paralyze
 @export var requires_line_of_sight: bool = true
+
+
+## Whether this spell resolves on the caster rather than on someone they aimed at.
+## Pulled into one predicate so `ArenaServer.request_cast` and both clients ask the
+## same question. Keyed off `effect_type` because CURE is the only self-cast effect
+## there is — the day a self-cast spell arrives that is not a cure (a heal, say), this
+## wants to become a `target` field on the resource instead.
+func is_self_cast() -> bool:
+	return effect_type == EffectType.CURE

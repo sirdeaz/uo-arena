@@ -60,6 +60,7 @@ const AXES := {
 		"magic arrow": Palette.SPELL_MAGIC_ARROW,
 		"lightning": Palette.SPELL_LIGHTNING,
 		"flamestrike": Palette.SPELL_FLAMESTRIKE,
+		"cure": Palette.SPELL_CURE,
 		"unknown spell": Palette.SPELL_UNKNOWN,
 	},
 }
@@ -140,6 +141,7 @@ func test_every_spell_colour_comes_from_the_palette() -> void:
 		"lightning": Palette.SPELL_LIGHTNING,
 		"flamestrike": Palette.SPELL_FLAMESTRIKE,
 		"paralyze": Palette.SPELL_PARALYZE,
+		"cure": Palette.SPELL_CURE,
 	}
 	for spell_name in FROM_PALETTE:
 		assert_eq(

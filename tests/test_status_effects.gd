@@ -89,3 +89,50 @@ func test_paralyze_holds_for_its_full_duration() -> void:
 	combatant.apply_paralyze(4.0)
 	combatant.tick_status(3.9)
 	assert_true(combatant.is_paralyzed(), "paralyze shouldn't end early")
+
+
+# ── Cure ─────────────────────────────────────────────────────────────────────────
+# Poison is the one effect that can be answered rather than only waited out.
+
+
+func test_cure_ends_the_poison_outright() -> void:
+	combatant.apply_poison(8.0, 3.0)
+	combatant.cure_poison()
+	assert_almost_eq(
+		combatant.poison_seconds_remaining, 0.0, "cure clears the whole timer, not part of it"
+	)
+	combatant.tick_status(5.0)
+	assert_almost_eq(combatant.health, 100.0, "and a cured combatant takes no further ticks")
+
+
+func test_curing_an_unpoisoned_combatant_is_a_harmless_no_op() -> void:
+	combatant.cure_poison()
+	combatant.tick_status(1.0)
+	assert_almost_eq(combatant.health, 100.0, "curing nothing costs nothing")
+
+
+func test_a_poison_landing_after_a_cure_owes_a_fresh_second() -> void:
+	# Part-way to the first tick, then cured, then re-poisoned.
+	combatant.apply_poison(8.0, 3.0)
+	combatant.tick_status(0.6)
+	combatant.cure_poison()
+	combatant.apply_poison(8.0, 3.0)
+	combatant.tick_status(0.6)
+	assert_almost_eq(
+		combatant.health, 100.0,
+		"cure resets the sub-tick accumulator, so 0.6s + 0.6s is not a tick"
+	)
+
+
+func test_a_poison_tick_interrupts_a_cure_in_progress() -> void:
+	# Cure has no special immunity: it is a cast, and a tick that lands before it
+	# completes breaks it like any other. Fitting one in means starting it in the gap
+	# right after a tick.
+	combatant.apply_poison(8.0, 3.0)
+	combatant.entity_state.try_start_cast(load("res://common/spells/cure.tres"))
+	combatant.tick_status(1.0)
+	assert_eq(
+		combatant.entity_state.current_state,
+		EntityState.State.INTERRUPTED,
+		"a poison tick mid-cure interrupts it"
+	)

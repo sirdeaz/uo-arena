@@ -16,7 +16,7 @@ func test_the_id_order_is_pinned() -> void:
 	# because this failed, append instead.
 	assert_eq(
 		SpellBook.IDS,
-		["magic_arrow", "poison", "lightning", "flamestrike", "paralyze"],
+		["magic_arrow", "poison", "lightning", "flamestrike", "paralyze", "cure"],
 		"spell ids may be appended to, never reordered"
 	)
 
@@ -78,12 +78,13 @@ func test_lookup_by_name_matches_lookup_by_id() -> void:
 # closes.
 
 
-func test_the_number_row_maps_to_the_first_five_spells_in_order() -> void:
+func test_the_number_row_maps_to_the_spells_in_order() -> void:
 	assert_eq(SpellBook.spell_id_for_hotkey(KEY_1), 0, "1 begins magic arrow")
 	assert_eq(SpellBook.spell_id_for_hotkey(KEY_2), 1, "2 begins poison")
 	assert_eq(SpellBook.spell_id_for_hotkey(KEY_3), 2, "3 begins lightning")
 	assert_eq(SpellBook.spell_id_for_hotkey(KEY_4), 3, "4 begins flamestrike")
 	assert_eq(SpellBook.spell_id_for_hotkey(KEY_5), 4, "5 begins paralyze")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_6), 5, "6 begins cure")
 
 
 func test_every_hotkey_resolves_to_a_real_spell() -> void:
@@ -97,6 +98,6 @@ func test_every_hotkey_resolves_to_a_real_spell() -> void:
 
 func test_a_key_off_the_number_row_is_not_a_hotkey() -> void:
 	assert_eq(SpellBook.spell_id_for_hotkey(KEY_0), -1, "0 is not a spell key")
-	assert_eq(SpellBook.spell_id_for_hotkey(KEY_6), -1, "there is no sixth spell")
+	assert_eq(SpellBook.spell_id_for_hotkey(KEY_7), -1, "there is no seventh spell")
 	assert_eq(SpellBook.spell_id_for_hotkey(KEY_A), -1, "a letter is not a spell key")
 	assert_eq(SpellBook.spell_id_for_hotkey(0), -1, "an unreported physical keycode is not a hotkey")

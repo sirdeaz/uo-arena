@@ -11,6 +11,8 @@ const EXPECTED_MANTRAS := {
 	"lightning": "Por Ort Grav",
 	"flamestrike": "Kal Vas Flam",
 	"paralyze": "An Ex Por",
+	# "negate poison", the mirror of Poison's "In Nox" ("create poison").
+	"cure": "An Nox",
 }
 
 

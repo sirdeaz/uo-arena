@@ -49,6 +49,9 @@ func apply_spell_effect(spell: SpellData, target: Combatant) -> void:
 			target.apply_poison(spell.effect_duration_seconds, spell.damage)
 		SpellData.EffectType.PARALYZE:
 			target.apply_paralyze(spell.effect_duration_seconds)
+		SpellData.EffectType.CURE:
+			# `target` is the caster for a self-cast spell — see `ArenaServer.request_cast`.
+			target.cure_poison()
 
 
 ## Called when a cast completes on the server. Returns whether the spell connected.
