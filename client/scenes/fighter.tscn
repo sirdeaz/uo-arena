@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://client/fighter.gd" id="1_fighter"]
+[ext_resource type="Resource" path="res://client/art/wizard.tres" id="2_sprite"]
+
+[node name="Fighter" type="CharacterBody2D"]
+script = ExtResource("1_fighter")
+sprite = ExtResource("2_sprite")

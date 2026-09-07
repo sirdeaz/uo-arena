@@ -9,14 +9,19 @@ extends TestCase
 ##
 ## **Registration.** Every set in the pack lands its feet within a pixel except the
 ## left-facing walk, which sits about 3.6 px left inside its cells; drawn from one
-## anchor a fighter hops sideways each time it turns. The anchors below are per heading
-## and the tests re-measure the committed atlas rather than trusting the constants,
-## because the failure is a hop no test of the drawing code would ever notice.
+## anchor a fighter hops sideways each time it turns. The anchors are per heading and
+## the tests re-measure the committed atlas rather than trusting the values in
+## `client/art/wizard.tres`, because the failure is a hop no test of the drawing code
+## would ever notice.
 ##
 ## **What the art is allowed to say.** Nothing a player reads under pressure. Ten
 ## fighters wear this one robe, so health, status, whose body it is and which spell is
 ## coming all stay `_draw()` calls in palette colours. The sprite carries posture and
 ## heading, and the tests here only ever ask it for those.
+##
+## The geometry now lives in a resource, so the frame-table checks load
+## `client/art/wizard.tres` and measure that — swap the pack in the editor and this file
+## re-measures whatever the `.tres` points at.
 
 const IDLE := FighterSprite.Anim.IDLE
 const WALK := FighterSprite.Anim.WALK
@@ -36,6 +41,13 @@ const REGISTRATION_TOLERANCE: float = 2.5
 
 const ALPHA_FLOOR: float = 16.0 / 255.0
 const HEM_ROWS: int = 16
+
+## The atlas as shipped and wired into `fighter.tscn`. The geometry checks measure this.
+var _sprite: FighterSprite
+
+
+func before_each() -> void:
+	_sprite = load("res://client/art/wizard.tres")
 
 
 # ── Heading ───────────────────────────────────────────────────────────────────────
@@ -185,9 +197,9 @@ func test_recovery_is_not_a_cast() -> void:
 
 
 func test_idle_loops_rather_than_running_off_the_end() -> void:
-	var span := FighterSprite.range_for(IDLE, DOWN)
+	var span := _sprite.range_for(IDLE, DOWN)
 	for step in 40:
-		var frame := FighterSprite.frame_for(IDLE, DOWN, float(step) * 0.1, 0.0)
+		var frame := _sprite.frame_for(IDLE, DOWN, float(step) * 0.1, 0.0)
 		assert_true(
 			frame >= span.x and frame < span.x + span.y,
 			"idle frame %d left its own set" % frame
@@ -195,22 +207,22 @@ func test_idle_loops_rather_than_running_off_the_end() -> void:
 
 
 func test_walking_animates_faster_than_standing() -> void:
-	var seconds := FighterSprite.IDLE_FRAME_SECONDS
+	var seconds := _sprite.idle_frame_seconds
 	assert_true(
-		FighterSprite.frame_for(WALK, DOWN, seconds, 0.0)
-		> FighterSprite.frame_for(IDLE, DOWN, seconds, 0.0),
+		_sprite.frame_for(WALK, DOWN, seconds, 0.0)
+		> _sprite.frame_for(IDLE, DOWN, seconds, 0.0),
 		"a walk should have moved further through its set than an idle in the same time"
 	)
 
 
 func test_a_cast_pose_tracks_the_spell_rather_than_the_clock() -> void:
-	var span := FighterSprite.range_for(CAST, DOWN)
+	var span := _sprite.range_for(CAST, DOWN)
 	assert_eq(
-		FighterSprite.frame_for(CAST, DOWN, 0.0, 0.0), span.x,
+		_sprite.frame_for(CAST, DOWN, 0.0, 0.0), span.x,
 		"a cast starts on its first frame"
 	)
 	assert_eq(
-		FighterSprite.frame_for(CAST, DOWN, 0.0, 1.0), span.x + span.y - 1,
+		_sprite.frame_for(CAST, DOWN, 0.0, 1.0), span.x + span.y - 1,
 		"and finishes on its last, however long the spell took"
 	)
 
@@ -219,24 +231,24 @@ func test_the_clock_does_not_move_a_cast_pose() -> void:
 	# Two spells at the same progress look the same, whether one is a magic arrow and
 	# the other a flamestrike four times as long.
 	assert_eq(
-		FighterSprite.frame_for(CAST, UP, 0.0, 0.5),
-		FighterSprite.frame_for(CAST, UP, 9.0, 0.5),
+		_sprite.frame_for(CAST, UP, 0.0, 0.5),
+		_sprite.frame_for(CAST, UP, 9.0, 0.5),
 		"a cast pose is a read on progress, not an animation that happens to be playing"
 	)
 
 
 func test_a_finished_cast_stays_on_its_last_frame() -> void:
-	var span := FighterSprite.range_for(CAST, RIGHT)
+	var span := _sprite.range_for(CAST, RIGHT)
 	assert_eq(
-		FighterSprite.frame_for(CAST, RIGHT, 0.0, 1.4), span.x + span.y - 1,
+		_sprite.frame_for(CAST, RIGHT, 0.0, 1.4), span.x + span.y - 1,
 		"progress past the end must not read off the end of the set"
 	)
 
 
 func test_a_negative_clock_does_not_produce_a_negative_frame() -> void:
-	var span := FighterSprite.range_for(WALK, LEFT)
+	var span := _sprite.range_for(WALK, LEFT)
 	assert_true(
-		FighterSprite.frame_for(WALK, LEFT, -3.0, 0.0) >= span.x,
+		_sprite.frame_for(WALK, LEFT, -3.0, 0.0) >= span.x,
 		"a clock running backwards must not index behind the set"
 	)
 
@@ -244,7 +256,7 @@ func test_a_negative_clock_does_not_produce_a_negative_frame() -> void:
 func test_every_heading_draws_a_different_pose() -> void:
 	var seen := {}
 	for facing in HEADINGS:
-		seen[FighterSprite.frame_for(WALK, facing, 0.0, 0.0)] = facing
+		seen[_sprite.frame_for(WALK, facing, 0.0, 0.0)] = facing
 	assert_eq(
 		seen.size(), HEADINGS.size(),
 		"two headings sharing a frame would point two fighters the same way"
@@ -255,7 +267,7 @@ func test_every_heading_draws_a_different_pose() -> void:
 
 
 func _region_pixels(region: Rect2) -> Array:
-	var image := FighterSprite.TEXTURE.get_image()
+	var image := _sprite.texture.get_image()
 	var opaque := []
 	for y in int(region.size.y):
 		for x in int(region.size.x):
@@ -286,18 +298,18 @@ func _standing_point(region: Rect2) -> Vector2:
 func test_the_atlas_is_the_strip_the_pack_supplied() -> void:
 	# Shipped exactly as handed over — no repacking step — so this pins the shape the
 	# frame maths assumes rather than a shape some script produced.
-	var size := FighterSprite.TEXTURE.get_size()
+	var size := _sprite.texture.get_size()
 	assert_almost_eq(
-		size.x, FighterSprite.CELL.x * float(FighterSprite.FRAME_COUNT),
-		"the strip should be exactly %d frames wide" % FighterSprite.FRAME_COUNT
+		size.x, _sprite.cell_size.x * float(_sprite.frame_count),
+		"the strip should be exactly %d frames wide" % _sprite.frame_count
 	)
-	assert_almost_eq(size.y, FighterSprite.CELL.y, "and one frame tall")
+	assert_almost_eq(size.y, _sprite.cell_size.y, "and one frame tall")
 
 
 func test_no_frame_falls_off_the_atlas() -> void:
-	var size := FighterSprite.TEXTURE.get_size()
-	for frame in FighterSprite.FRAME_COUNT:
-		var region := FighterSprite.region_for(frame)
+	var size := _sprite.texture.get_size()
+	for frame in _sprite.frame_count:
+		var region := _sprite.region_for(frame)
 		assert_true(
 			region.end.x <= size.x and region.end.y <= size.y,
 			"frame %d reads past the edge of the atlas" % frame
@@ -307,9 +319,9 @@ func test_no_frame_falls_off_the_atlas() -> void:
 func test_every_set_the_client_can_ask_for_is_inside_the_strip() -> void:
 	for anim in [IDLE, WALK, CAST]:
 		for facing in HEADINGS:
-			var span := FighterSprite.range_for(anim, facing)
+			var span := _sprite.range_for(anim, facing)
 			assert_true(
-				span.x >= 0 and span.x + span.y <= FighterSprite.FRAME_COUNT,
+				span.x >= 0 and span.x + span.y <= _sprite.frame_count,
 				"animation %d heading %d runs past the end of the strip" % [anim, facing]
 			)
 
@@ -319,10 +331,10 @@ func test_no_frame_the_client_can_ask_for_is_blank() -> void:
 	# would vanish mid-spell.
 	for anim in [WALK, CAST]:
 		for facing in HEADINGS:
-			var span := FighterSprite.range_for(anim, facing)
+			var span := _sprite.range_for(anim, facing)
 			for offset in span.y:
 				assert_false(
-					_region_pixels(FighterSprite.region_for(span.x + offset)).is_empty(),
+					_region_pixels(_sprite.region_for(span.x + offset)).is_empty(),
 					"animation %d heading %d frame %d is blank" % [anim, facing, offset]
 				)
 
@@ -333,7 +345,7 @@ func test_no_two_sets_overlap() -> void:
 	var owner := {}
 	for anim in [WALK, CAST]:
 		for facing in HEADINGS:
-			var span := FighterSprite.range_for(anim, facing)
+			var span := _sprite.range_for(anim, facing)
 			for offset in span.y:
 				var frame := span.x + offset
 				assert_false(
@@ -344,14 +356,14 @@ func test_no_two_sets_overlap() -> void:
 
 
 func test_every_heading_stands_where_its_anchor_says() -> void:
-	# The measurement that matters: re-read the committed atlas and check the constants
+	# The measurement that matters: re-read the committed atlas and check the resource
 	# against it. Walk frames only — a staff or a flame dipping below the hem makes a
 	# cast frame's lowest row something other than the character's feet.
 	for facing in HEADINGS:
-		var span := FighterSprite.range_for(WALK, facing)
-		var anchor: Vector2 = FighterSprite.ANCHORS[facing]
+		var span := _sprite.range_for(WALK, facing)
+		var anchor: Vector2 = _sprite.anchor(facing)
 		for offset in span.y:
-			var standing := _standing_point(FighterSprite.region_for(span.x + offset))
+			var standing := _standing_point(_sprite.region_for(span.x + offset))
 			assert_true(
 				standing.distance_to(anchor) <= REGISTRATION_TOLERANCE,
 				"heading %d frame %d stands at %s, not at its anchor %s — fighters will hop when they turn" % [
@@ -364,15 +376,15 @@ func test_the_left_anchor_really_is_different() -> void:
 	# The one correction in the table. If a refactor collapses the anchors back to a
 	# single value this fails, and the left-facing walk starts hopping again.
 	assert_false(
-		FighterSprite.ANCHORS[LEFT].is_equal_approx(FighterSprite.ANCHORS[RIGHT]),
+		_sprite.anchor(LEFT).is_equal_approx(_sprite.anchor(RIGHT)),
 		"the left set sits ~3.6px left in its cells and needs its own anchor"
 	)
 
 
 func test_the_feet_land_where_the_fighter_is() -> void:
 	for facing in HEADINGS:
-		var rect := FighterSprite.rect_for(Vector2.ZERO, facing)
-		var anchor: Vector2 = FighterSprite.ANCHORS[facing]
+		var rect := _sprite.rect_for(Vector2.ZERO, facing)
+		var anchor: Vector2 = _sprite.anchor(facing)
 		assert_almost_eq(
 			rect.position.y + anchor.y, 0.0,
 			"heading %d should stand on its own position, not hover above it" % facing
@@ -387,10 +399,10 @@ func test_the_channel_frames_are_left_alone() -> void:
 	# Recorded as a decision rather than an oversight: the game already announces a cast
 	# with the mantra and an aura in the spell's own colour, and this set is a fixed
 	# yellow-and-blue flourish that would say the same thing again in the wrong colour.
-	var channel := FighterSprite.CHANNEL_RANGE
+	var channel := _sprite.channel_range
 	for anim in [IDLE, WALK, CAST]:
 		for facing in HEADINGS:
-			var span := FighterSprite.range_for(anim, facing)
+			var span := _sprite.range_for(anim, facing)
 			assert_true(
 				span.x + span.y <= channel.x or span.x >= channel.x + channel.y,
 				"animation %d heading %d reaches into the unused channel frames" % [anim, facing]

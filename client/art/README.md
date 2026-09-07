@@ -2,10 +2,12 @@
 
 ## wizard.png
 
-The fighters. One strip of 46 frames, 79×65 each — 3634×65 in total — read by
-`client/fighter_sprite.gd`. It draws **four headings**: a six-frame walk and a four-frame
-cast for each of down, up, right and left, plus a six-frame channel set the game does not
-use.
+The fighters. One strip of 46 frames, 79×65 each — 3634×65 in total. `wizard.tres`
+(a `FighterSprite` resource — see `client/fighter_sprite.gd`) points at this PNG and
+carries the frame table; `client/scenes/fighter.tscn` assigns that resource to every
+fighter, so the sheet is swapped in the inspector, not in code. It draws **four
+headings**: a six-frame walk and a four-frame cast for each of down, up, right and left,
+plus a six-frame channel set the game does not use.
 
 It carries **posture and heading, and nothing else** — which way you are pointing, whether
 you are walking, whether a spell is coming. Health, status, whose body this is and which
@@ -29,20 +31,21 @@ checked.
 There is **no packing step**. The pack arrives as a registered atlas on a uniform 79×65
 grid, so what ships is the artwork that was handed over, byte for byte, and there is no
 script standing between the two that could quietly change it. The frame table in
-`client/fighter_sprite.gd` was read off the sheet rather than derived — walk and cast
-alternate by heading instead of sitting in blocks, so it is a table and not a stride.
+`wizard.tres` was read off the sheet rather than derived — walk and cast alternate by
+heading instead of sitting in blocks, so it is a table and not a stride.
 
 ### Two things measured rather than assumed
 
 - **The left-facing walk sits about 3.6 px left in its cells.** Everything else registers
   within a pixel. Drawn from one anchor a fighter would hop sideways every time it turned,
-  so `FighterSprite.ANCHORS` is per heading, and
+  so the `anchor_*` fields in `wizard.tres` are per heading, and
   `test_every_heading_stands_where_its_anchor_says` re-measures the committed PNG rather
-  than trusting the constants.
+  than trusting them.
 - **Frames 40–45 are a staff-raised channel** with its own yellow-and-blue sparkle burst,
   and are deliberately unused. The game already announces a cast with the mantra overhead
   and an aura in the colour of the spell being cast; this would say the same thing again,
   in the wrong colour. `test_the_channel_frames_are_left_alone` pins that as a decision.
 
-Replacing the pack means re-measuring both. The tests read the atlas, so a swap that gets
-the layout wrong fails rather than shipping a fighter who hops, or vanishes mid-spell.
+Replacing the pack means dropping the new texture into `wizard.tres` and re-measuring
+both. The tests read the atlas the resource points at, so a swap that gets the layout
+wrong fails rather than shipping a fighter who hops, or vanishes mid-spell.
