@@ -10,14 +10,6 @@ extends Node2D
 ##   M            mute
 ##   P            route around cover instead of walking into it
 
-const SPELL_KEYS := {
-	KEY_1: "magic_arrow",
-	KEY_2: "poison",
-	KEY_3: "lightning",
-	KEY_4: "flamestrike",
-	KEY_5: "paralyze",
-}
-
 const DUMMY_THINK_SECONDS: float = 0.9
 
 var map: ArenaMap
@@ -176,12 +168,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		_last_event = "pathing %s" % ("ON" if player.toggle_pathfinding() else "OFF")
 		return
 
-	if not SPELL_KEYS.has(key.keycode):
+	var spell_id := SpellBook.spell_id_for_hotkey(key.physical_keycode)
+	if spell_id < 0:
 		return
 	if not player.combatant.is_alive():
 		return
 
-	var spell := _spell(SPELL_KEYS[key.keycode])
+	var spell := SpellBook.spell_for(spell_id)
 	if not resolver.try_begin_cast(player.combatant, dummy.combatant, spell):
 		if not resolver.can_see(player.combatant, dummy.combatant):
 			_last_event = "%s — no line of sight" % spell.spell_name

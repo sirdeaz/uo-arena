@@ -19,6 +19,19 @@ const IDS: Array[String] = [
 	"paralyze",
 ]
 
+## The number-row key that begins each spell, by stem. Keyed for lookup against an
+## event's `physical_keycode` rather than its `keycode`: `keycode` is the label the
+## key types under the active layout, so on AZERTY the number row reports `& é " ' (`
+## and only `2` still resolves to `KEY_2`. `physical_keycode` is the key's position,
+## the same promise `Input.is_physical_key_pressed` already makes for WASD steering.
+const HOTKEY_STEMS := {
+	KEY_1: "magic_arrow",
+	KEY_2: "poison",
+	KEY_3: "lightning",
+	KEY_4: "flamestrike",
+	KEY_5: "paralyze",
+}
+
 static var _by_id: Array[SpellData] = []
 static var _id_by_name: Dictionary = {}
 
@@ -54,6 +67,17 @@ static func id_of(spell: SpellData) -> int:
 ## copy-pasted into every caller that needed a spell by name.
 static func by_name(stem: String) -> SpellData:
 	return spell_for(IDS.find(stem))
+
+
+## The wire id of the spell a number-row key begins, or -1 when the key is not a spell
+## hotkey. Pass an event's `physical_keycode`; see `HOTKEY_STEMS` for why not `keycode`.
+##
+## A `physical_keycode` of 0 — some platforms report it for some keys — is not a
+## hotkey, and falls through the `has` check like any other unmapped key.
+static func spell_id_for_hotkey(physical_keycode: int) -> int:
+	if not HOTKEY_STEMS.has(physical_keycode):
+		return -1
+	return IDS.find(HOTKEY_STEMS[physical_keycode])
 
 
 static func _ensure_loaded() -> void:

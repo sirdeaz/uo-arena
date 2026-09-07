@@ -17,14 +17,6 @@ class_name ArenaClient
 signal input_changed(direction: Vector2)
 signal cast_requested(spell_id: int, target_peer: int)
 
-const SPELL_KEYS := {
-	KEY_1: "magic_arrow",
-	KEY_2: "poison",
-	KEY_3: "lightning",
-	KEY_4: "flamestrike",
-	KEY_5: "paralyze",
-}
-
 ## How near a click has to land to pick somebody. Generous relative to the 18 px body,
 ## because missing your target selection in a ten-player brawl is worse than
 ## occasionally selecting the wrong neighbour.
@@ -250,14 +242,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		audio.toggle_muted()
 		return
 
-	if not SPELL_KEYS.has(key.keycode):
+	var spell_id := SpellBook.spell_id_for_hotkey(key.physical_keycode)
+	if spell_id < 0:
 		return
 
 	if _target_peer == 0 or not _fighters.has(_target_peer):
 		_last_event = "no target — click someone first"
 		return
-
-	var spell_id := SpellBook.IDS.find(SPELL_KEYS[key.keycode])
 
 	# The server refuses a shot into cover silently — a refusal costs nothing, so it
 	# announces nothing — which would leave a pressed key doing nothing with no
