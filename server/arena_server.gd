@@ -169,7 +169,13 @@ func request_cast(peer_id: int, spell_id: int, target_peer: int) -> bool:
 	var spell := SpellBook.spell_for(spell_id)
 	if spell == null:
 		return false
-	if target_peer == peer_id or not _players.has(target_peer):
+
+	# A self-cast spell (Cure) resolves on the caster. It ignores whatever target the
+	# client named — in a free-for-all there is nobody else worth aiming it at — and is
+	# exempt from the "someone who isn't you" rule every other spell obeys.
+	if spell.is_self_cast():
+		target_peer = peer_id
+	elif target_peer == peer_id or not _players.has(target_peer):
 		return false
 
 	var target: Player = _players[target_peer]

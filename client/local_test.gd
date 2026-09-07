@@ -5,7 +5,7 @@ extends Node2D
 ## and interrupts can be felt before any of it goes over the wire.
 ##
 ##   RIGHT MOUSE  walk toward the cursor (WASD also works, for testing)
-##   1-5          magic arrow / poison / lightning / flamestrike / paralyze
+##   1-6          magic arrow / poison / lightning / flamestrike / paralyze / cure
 ##   R            reset the round
 ##   M            mute
 ##   P            route around cover instead of walking into it
@@ -114,7 +114,10 @@ func _connect_combat(from: Fighter, to: Fighter) -> void:
 
 
 func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
-	var connected := resolver.resolve_cast(from.combatant, to.combatant, spell)
+	# A self-cast spell (Cure) lands on the caster, not on the fixed opponent this
+	# connection was bound to.
+	var recipient := from if spell.is_self_cast() else to
+	var connected := resolver.resolve_cast(from.combatant, recipient.combatant, spell)
 	var who := "you" if from == player else "dummy"
 	_last_event = "%s cast %s — %s" % [
 		who, spell.spell_name, "hit" if connected else "blocked by cover"
@@ -124,7 +127,7 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 		# already follow: a blocked spell is silent and invisible, because in UO it
 		# simply never went off.
 		audio.play(SpellAudio.Cue.IMPACT)
-		_bolts.add_effect(from.position, to.position, spell)
+		_bolts.add_effect(from.position, recipient.position, spell)
 
 
 func _process(delta: float) -> void:
@@ -179,7 +182,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 
 	var spell := SpellBook.spell_for(spell_id)
-	if not resolver.try_begin_cast(player.combatant, dummy.combatant, spell):
+	# Cure resolves on you; everything else flies at the dummy.
+	var target: Combatant = player.combatant if spell.is_self_cast() else dummy.combatant
+	if not resolver.try_begin_cast(player.combatant, target, spell):
 		if not resolver.can_see(player.combatant, dummy.combatant):
 			_last_event = "%s — no line of sight" % spell.spell_name
 
@@ -212,7 +217,7 @@ func _update_hud() -> void:
 			# can only see the consequences of should say which way it is set.
 			"ON" if player.pathfinding_enabled else "OFF",
 		],
-		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze",
+		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze   6 cure",
 		"",
 		"you %d    dummy %d" % [
 			roundi(player.combatant.health), roundi(dummy.combatant.health)

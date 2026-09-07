@@ -6,7 +6,7 @@ extends TestCase
 ## cast animation useless as a read, the same way a duplicated mantra would.
 
 const SPELL_NAMES := [
-	"magic_arrow", "poison", "lightning", "flamestrike", "paralyze",
+	"magic_arrow", "poison", "lightning", "flamestrike", "paralyze", "cure",
 ]
 
 

@@ -17,6 +17,7 @@ const IDS: Array[String] = [
 	"lightning",
 	"flamestrike",
 	"paralyze",
+	"cure",
 ]
 
 ## The number-row key that begins each spell, by stem. Keyed for lookup against an
@@ -30,6 +31,7 @@ const HOTKEY_STEMS := {
 	KEY_3: "lightning",
 	KEY_4: "flamestrike",
 	KEY_5: "paralyze",
+	KEY_6: "cure",
 }
 
 static var _by_id: Array[SpellData] = []

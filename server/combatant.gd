@@ -72,6 +72,16 @@ func apply_paralyze(duration_seconds: float) -> void:
 	paralyze_seconds_remaining = maxf(paralyze_seconds_remaining, duration_seconds)
 
 
+## Poison off, all of it — the timer, the per-tick damage, and the sub-tick
+## accumulator, so a re-poison later starts clean rather than part-way to its next
+## tick. The same three fields `revive` clears; curing with no poison on you is a
+## harmless no-op.
+func cure_poison() -> void:
+	poison_seconds_remaining = 0.0
+	poison_damage_per_tick = 0.0
+	_poison_tick_accumulator = 0.0
+
+
 ## Stand back up. Full health, nothing lingering, and nothing queued — a respawn is not
 ## a fizzle and not an interrupt, so `entity_state.reset()` announces none of them.
 func revive(at: Vector2) -> void:

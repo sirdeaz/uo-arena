@@ -7,6 +7,7 @@ extends TestCase
 
 const ARROW := 0
 const FLAMESTRIKE := 3
+const CURE := 5
 
 var server: ArenaServer
 var resolutions: Array = []
@@ -127,6 +128,29 @@ func test_a_stranger_cannot_cast() -> void:
 func test_nobody_can_cast_at_themselves() -> void:
 	await _duel()
 	assert_false(server.request_cast(2, ARROW, 2), "self-targeting is refused")
+
+
+func test_a_self_cast_spell_is_the_exception_and_may_target_the_caster() -> void:
+	await _duel()
+	assert_true(
+		server.request_cast(2, CURE, 2), "cure is cast on yourself, so self-targeting it is allowed"
+	)
+
+
+func test_a_self_cast_spell_lands_on_the_caster_whoever_was_named() -> void:
+	await _duel()
+	server.combatant_of(2).apply_poison(8.0, 3.0)
+	server.combatant_of(3).apply_poison(8.0, 3.0)
+	# Aimed at 3 on purpose: a self-cast spell must ignore that and resolve on 2.
+	assert_true(server.request_cast(2, CURE, 3), "cure starts even when aimed at someone else")
+	await _run(Constants.GLOBAL_CAST_RECOVERY_SECONDS + 1.0)
+	assert_almost_eq(
+		server.combatant_of(2).poison_seconds_remaining, 0.0, "the caster's own poison is lifted"
+	)
+	assert_true(
+		server.combatant_of(3).poison_seconds_remaining > 0.0,
+		"the named target is untouched — cure never travelled to them"
+	)
 
 
 func test_casting_at_a_stranger_is_refused() -> void:

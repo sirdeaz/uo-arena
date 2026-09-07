@@ -81,6 +81,20 @@ func test_paralyze_deals_no_direct_damage() -> void:
 	assert_almost_eq(target.health, before, "paralyze is control, not damage")
 
 
+func test_cure_effect_clears_the_poison_it_is_cast_against() -> void:
+	target.apply_poison(8.0, 3.0)
+	resolver.apply_spell_effect(_spell("cure"), target)
+	assert_almost_eq(
+		target.poison_seconds_remaining, 0.0, "cure lifts the poison outright"
+	)
+
+
+func test_cure_effect_deals_no_damage() -> void:
+	var before := target.health
+	resolver.apply_spell_effect(_spell("cure"), target)
+	assert_almost_eq(target.health, before, "cure is restorative, not an attack")
+
+
 # ── starting a cast needs a target you can see ────────────────────────────────
 
 func test_a_cast_can_begin_with_a_clear_shot() -> void:

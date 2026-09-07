@@ -198,6 +198,12 @@ const SPELL_LIGHTNING := Color("#fff2a8")
 const SPELL_FLAMESTRIKE := Color("#ff8a4c")
 const SPELL_PARALYZE := STATUS_PARALYZED
 
+## Cure. A violet of its own rather than a borrow: green is poison, and a cleanse
+## flashed in green would read as the poison landing, not lifting. Nothing else on the
+## spell axis is near this hue, so the burst at your feet is unmistakably "the poison
+## just went".
+const SPELL_CURE := Color("#b98cff")
+
 ## For a spell added without a colour of its own. Deliberately drab: an unstyled spell
 ## should look unfinished rather than quietly pass for a real one.
 const SPELL_UNKNOWN := Color("#d8d8d8")

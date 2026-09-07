@@ -22,6 +22,10 @@ const STYLES := {
 	"Lightning": Style.ARC,
 	"Flamestrike": Style.FLAME,
 	"Paralyze": Style.ARC,
+	# Cure has no bolt in flight — caster and target are the same point, so the bolt
+	# path collapses and only the burst at your feet draws. FLAME keeps that burst soft
+	# rather than jagged.
+	"Cure": Style.FLAME,
 }
 
 ## The colours themselves live in `Palette` so poison and paralyze can be one value
@@ -32,6 +36,7 @@ const COLORS := {
 	"Lightning": Palette.SPELL_LIGHTNING,
 	"Flamestrike": Palette.SPELL_FLAMESTRIKE,
 	"Paralyze": Palette.SPELL_PARALYZE,
+	"Cure": Palette.SPELL_CURE,
 }
 
 

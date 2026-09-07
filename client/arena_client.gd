@@ -250,6 +250,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if spell_id < 0:
 		return
 
+	var spell := SpellBook.spell_for(spell_id)
+
+	# Cure resolves on you: no target to pick, no line of sight to check. The server
+	# forces the target to yourself anyway — this just spares the "no target" nag.
+	if spell != null and spell.is_self_cast():
+		cast_requested.emit(spell_id, local_peer_id)
+		return
+
 	if _target_peer == 0 or not _fighters.has(_target_peer):
 		_last_event = "no target — click someone first"
 		return
@@ -258,10 +266,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	# announces nothing — which would leave a pressed key doing nothing with no
 	# explanation. Say so locally. The request still goes: the server is the authority
 	# on what you can see, and its answer overwrites this line either way.
-	if not _has_line_of_sight_to_target():
-		var spell := SpellBook.spell_for(spell_id)
-		if spell != null:
-			_last_event = "%s — no line of sight" % spell.spell_name
+	if not _has_line_of_sight_to_target() and spell != null:
+		_last_event = "%s — no line of sight" % spell.spell_name
 
 	cast_requested.emit(spell_id, _target_peer)
 
@@ -358,7 +364,7 @@ func _update_hud() -> void:
 		"hold RIGHT MOUSE to move    LEFT CLICK a player to target    M %s" % (
 			"unmute" if audio.is_muted() else "mute"
 		),
-		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze",
+		"1 arrow   2 poison   3 lightning   4 flamestrike   5 paralyze   6 cure",
 		"",
 	]
 
