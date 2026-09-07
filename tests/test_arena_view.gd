@@ -1,12 +1,13 @@
 extends TestCase
 
-## `ArenaView` is the only thing standing between a collision shape and a player who
-## cannot see it. Cover that blocks line of sight but draws nothing is the worst bug
-## this game has — the opponent's casts fail silently and it looks like the resolver
-## is broken — so these tests treat "every shape in the map is drawable" as a property
-## of the map, not something to check by eye.
+## The arena is drawn from tiles now, and `tests/test_arena_tiles.gd` is what guarantees
+## a solid tile sits over every collider. `ArenaView` kept the shape-to-outline
+## conversion — `PathFinder` routes around the same polygons, and the developer overlay
+## draws them — so these tests still pin that every shape the map can hold has an
+## outline, and that an unknown shape reports itself rather than vanishing.
 ##
-## `tests/test_arena_map.gd` deliberately cannot catch this: an invisible rock satisfies
+## Cover that blocks line of sight but is not drawn is still the worst bug this game has;
+## `tests/test_arena_map.gd` deliberately cannot catch it — an invisible rock satisfies
 ## every reachability and fairness assertion it makes.
 
 var map: ArenaMap
@@ -132,23 +133,3 @@ func test_the_kind_hint_carries_no_rendering_into_the_server_scene() -> void:
 					piece.name, child.name
 				]
 			)
-
-
-# ── the floor says how far away things are ────────────────────────────────────
-
-func test_a_floor_grid_cell_is_one_second_of_movement() -> void:
-	# The grid is a distance readout, not decoration: counting cells to a tent is
-	# counting seconds against a cast time.
-	assert_almost_eq(
-		ArenaView.grid_pitch(),
-		Constants.PLAYER_MOVE_SPEED,
-		"one grid cell should be one second of running"
-	)
-
-
-func test_the_grid_is_fine_enough_to_show_movement_across_the_arena() -> void:
-	var cells_across := (ArenaMap.HALF_WIDTH * 2.0) / ArenaView.grid_pitch()
-	assert_true(
-		cells_across >= 4.0,
-		"the arena should be several cells wide, is %.1f" % cells_across
-	)

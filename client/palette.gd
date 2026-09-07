@@ -25,10 +25,18 @@ class_name Palette
 # ── Backdrop ──────────────────────────────────────────────────────────────────────
 # Everything signals are drawn *over*: the arena itself, and UI chrome. These are
 # deliberately close to one another and low in contrast; nothing here is a read.
+#
+# The arena is painted from `client/art/Grass-01.png` now (see
+# `client/scenes/arena_ground.tscn`), so `FLOOR`, `COVER_FILL`, `TENT_DOOR` and the
+# `GRID` set below no longer reach a `_draw` call. They are kept as the written brief the
+# tileset was drawn to match, and as the colours the `ArenaView` developer overlay and
+# `tests/test_palette.gd` still read — not because anything renders them.
 
 const FLOOR := Color("#1b1f2a")
 const WALL := Color("#2b2f3a")
 const COVER_FILL := Color("#4a4234")
+
+## Still live: the outline colour the `ArenaView` debug overlay draws cover in.
 const COVER_EDGE := Color("#8a7a5c")
 
 ## Backing for the cast bar, and the hairline around it.
@@ -47,16 +55,14 @@ const OUTLINE := Color("#0d1017")
 ## should recede into the scene rather than read as a second, darker bar.
 const BAR_TRACK := WALL
 
-## The mouth of a tent. Darker than anything else on the floor, because the shadowed
-## opening is what makes a peaked shape read as somewhere you could stand behind.
+## Was the mouth of a procedurally-drawn tent. The tents are cliff tiles now and have no
+## drawn doorway; kept as part of the backdrop brief.
 const TENT_DOOR := Color("#241f18")
 
-## The ground grid: one cell per second of movement, so distance to cover can be counted
-## against a cast time instead of guessed. Drawn at `GRID_ALPHA`, and at
-## `GRID_AXIS_ALPHA` on the two centre lines, which also show the arena's symmetry.
-##
-## Both alphas are deliberately tiny. This is a measuring aid on the backdrop; the moment
-## it competes with the sight line or a bolt it has cost more than it gave.
+## Was the ground grid — one cell per second of movement, a distance readout the flat
+## floor needed. The textured floor gives that reference by eye, so the grid and its two
+## tests went with #7's rect. Kept here as the brief, and because `tests/test_palette.gd`
+## still reads `GRID` off the backdrop axis.
 const GRID := Color("#39415a")
 const GRID_ALPHA: float = 0.16
 const GRID_AXIS_ALPHA: float = 0.34
