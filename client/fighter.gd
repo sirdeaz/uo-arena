@@ -147,11 +147,6 @@ func _ready() -> void:
 
 	combatant.position = global_position
 
-	# Nearest-neighbour, and only on this node: the character is pixel art, and the
-	# engine's default smoothing turns a 64 px mage into a smear. The overhead text on
-	# `_ui` is deliberately left on the default filter, where it belongs.
-	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-
 	# Spell energy draws on its own additive layer so glow accumulates toward white
 	# instead of flatly tinting the character. Kept at z 0, not below: a negative
 	# z_index would sort it under the arena floor, which then paints over it.
@@ -171,6 +166,10 @@ func _ready() -> void:
 	# decide fights, and a cast aura is now big enough and high enough to sit right
 	# behind them — so they go over the glow, not under it.
 	_ui = Node2D.new()
+	# The project draws everything nearest-neighbour now (pixel-art tiles and the mage),
+	# but the overhead text wants the smoothing back — a downscaled Uncial glyph under
+	# nearest sampling crawls. This is the one node that opts out.
+	_ui.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	add_child(_ui)
 	_ui.draw.connect(_draw_ui)
 
