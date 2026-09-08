@@ -30,26 +30,28 @@ const INPUT_HEARTBEAT_SECONDS: float = 0.1
 ## `client/art/wizard.tres` and can be swapped in the editor.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 
-## Authored chrome — layout lives in the scene, not in `ArenaHud._ready()`.
-const HUD_SCENE := preload("res://client/scenes/arena_hud.tscn")
-
 ## Which peer this client is playing. Set before adding the node to the tree.
 var local_peer_id: int = 0
 
 var map: ArenaMap
-var hud: ArenaHud
+
+## The camera, the sight-line layer, the bolt layer, the audio node, the HUD and the
+## debug overlay all live in `client/scenes/arena_stage.tscn`, shared verbatim with the
+## practice harness — the "looks exactly like the practice one" promise is one authored
+## scene now, not two `_ready()` methods kept identical by hand.
+@onready var hud: ArenaHud = $Stage/ArenaHud
 
 ## Used for the sight line only. The server does its own raycasting and this one has no
 ## authority over anything — it exists so you can see the shot you are being told about.
-var resolver: CombatResolver
+@onready var resolver: CombatResolver = $Stage/Resolver
+
+@onready var audio: SpellAudio = $Stage/Audio
+@onready var _sight_line: Node2D = $Stage/SightLine
+@onready var _bolts: BoltLayer = $Stage/Bolts
 
 var _fighters: Dictionary = {}
 var _target_peer: int = 0
 var _last_event: String = ""
-
-var _sight_line: Node2D
-var _bolts: BoltLayer
-var audio: SpellAudio
 
 var _last_sent_input: Vector2 = Vector2.ZERO
 var _seconds_since_input_sent: float = 0.0
@@ -58,34 +60,13 @@ var _seconds_since_input_sent: float = 0.0
 func _ready() -> void:
 	map = load("res://server/arena_map.tscn").instantiate()
 	add_child(map)
-
-	var view := ArenaView.new()
-	add_child(view)
-	view.setup(map)
+	($Stage/ArenaView as ArenaView).setup(map)
 
 	# Fixed at the origin: at 0.85 zoom a 1280×720 window shows 1506×847, and the arena
 	# is 1200×800, so all ten players are always on screen and nothing has to follow.
-	var camera := Camera2D.new()
-	camera.zoom = Vector2(0.85, 0.85)
-	add_child(camera)
-	camera.make_current()
+	($Stage/Camera2D as Camera2D).make_current()
 
-	resolver = CombatResolver.new()
-	add_child(resolver)
-
-	_sight_line = Node2D.new()
-	_sight_line.z_index = 5
-	add_child(_sight_line)
 	_sight_line.draw.connect(_draw_sight_line)
-
-	_bolts = BoltLayer.new()
-	add_child(_bolts)
-
-	audio = SpellAudio.new()
-	add_child(audio)
-
-	hud = HUD_SCENE.instantiate()
-	add_child(hud)
 
 
 # ── What the server tells us ──────────────────────────────────────────────────────

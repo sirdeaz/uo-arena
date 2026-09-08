@@ -1,0 +1,29 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://client/arena_view.gd" id="1_view"]
+[ext_resource type="Script" path="res://server/combat_resolver.gd" id="2_resolver"]
+[ext_resource type="Script" path="res://client/bolt_layer.gd" id="3_bolts"]
+[ext_resource type="Script" path="res://client/spell_audio.gd" id="4_audio"]
+[ext_resource type="PackedScene" path="res://client/scenes/arena_hud.tscn" id="5_hud"]
+
+[node name="Stage" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
+zoom = Vector2(0.85, 0.85)
+
+[node name="ArenaView" type="Node2D" parent="."]
+script = ExtResource("1_view")
+
+[node name="Resolver" type="Node" parent="."]
+script = ExtResource("2_resolver")
+
+[node name="SightLine" type="Node2D" parent="."]
+z_index = 5
+
+[node name="Bolts" type="Node2D" parent="."]
+script = ExtResource("3_bolts")
+
+[node name="Audio" type="Node" parent="."]
+script = ExtResource("4_audio")
+
+[node name="ArenaHud" parent="." instance=ExtResource("5_hud")]
