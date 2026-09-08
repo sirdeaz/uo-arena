@@ -95,8 +95,27 @@ if [ "$want_linux" -eq 1 ]; then
     echo "Linux: build/UOArena-linux-x86_64.tar.gz ($(human_size build/UOArena-linux-x86_64.tar.gz))"
 fi
 
+# The dedicated-server build is meant to carry collision and no art. Nothing in
+# `server/` references a texture today, so this is a regression guard: if a future scene
+# drags `client/art/` into the server's dependency graph, the PCK grows a megabyte of
+# grass and the "collision only" promise quietly breaks. `--headless` would still run it.
+assert_server_pck_has_no_textures() {
+    pck=$(ls build/server/*.pck 2>/dev/null | head -n1)
+    if [ -z "$pck" ]; then
+        echo "  error: no server PCK to check for textures" >&2
+        exit 1
+    fi
+    if strings "$pck" | grep -qiE '\.(png|ctex|webp|jpg|jpeg|svg)$'; then
+        echo "  error: the dedicated-server PCK contains texture files:" >&2
+        strings "$pck" | grep -iE '\.(png|ctex|webp|jpg|jpeg|svg)$' | sort -u >&2
+        exit 1
+    fi
+    echo "Server PCK: no textures ($(human_size "$pck"))"
+}
+
 if [ "$want_server" -eq 1 ]; then
     export_preset "Linux Dedicated Server" build/server
+    assert_server_pck_has_no_textures
     echo "Server: build/server/UOArenaServer.x86_64"
 fi
 
