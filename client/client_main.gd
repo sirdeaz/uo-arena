@@ -1,13 +1,24 @@
 extends Node
 
 ## Where a client decides what kind of session it is in: a browser build practises
-## offline, `--connect <host>` goes straight to a server, and anything else gets a menu.
+## offline, `--connect <host>` goes straight to a server, and anything else gets the
+## join menu.
+##
+## The menu itself is authored in `client/client_main.tscn` now — its layout, its
+## `menu_theme.tres` and the fact that it exists are the scene's business. This script
+## only wires behaviour: which button does what, and what the status line says.
 
 const DEFAULT_ADDRESS := "127.0.0.1"
 
-var _address: LineEdit
-var _status: Label
-var _connect_button: Button
+## Where "Offline practice" goes. A scene reference wired in the Inspector rather than a
+## `change_scene_to_file("res://…")` string in two places.
+@export var practice_scene: PackedScene
+
+@onready var _menu: CanvasLayer = $Menu
+@onready var _address: LineEdit = $Menu/Panel/Address
+@onready var _status: Label = $Menu/Panel/Status
+@onready var _connect_button: Button = $Menu/Panel/ConnectButton
+@onready var _hint: Label = $Menu/Panel/Hint
 
 
 func _ready() -> void:
@@ -15,10 +26,18 @@ func _ready() -> void:
 	# offer and never constructs a peer. It boots into the practice harness exactly as
 	# it always has — which is what keeps the published page working unchanged.
 	if OS.has_feature("web"):
-		get_tree().change_scene_to_file.call_deferred("res://client/scenes/local_test.tscn")
+		_go_to_practice.call_deferred()
 		return
 
-	_build_ui()
+	# Secondary and error text get their own chrome entries so nothing on the menu
+	# borrows a cast-feedback colour (#19). The theme carries the rest.
+	_hint.add_theme_color_override("font_color", Palette.UI_TEXT_DIM)
+	_status.add_theme_color_override("font_color", Palette.UI_TEXT_ALERT)
+
+	_address.text = DEFAULT_ADDRESS
+	_address.text_submitted.connect(func(text: String) -> void: _connect_to(text))
+	_connect_button.pressed.connect(func() -> void: _connect_to(_address.text))
+	($Menu/Panel/PracticeButton as Button).pressed.connect(_go_to_practice)
 
 	if NetworkManager.last_failure != "":
 		_status.text = NetworkManager.last_failure
@@ -31,49 +50,12 @@ func _ready() -> void:
 		_connect_to(address)
 
 
-func _build_ui() -> void:
-	var layer := CanvasLayer.new()
-	add_child(layer)
-
-	var panel := VBoxContainer.new()
-	panel.position = Vector2(80.0, 200.0)
-	panel.custom_minimum_size = Vector2(420.0, 0.0)
-	panel.add_theme_constant_override("separation", 12)
-	layer.add_child(panel)
-
-	var title := Label.new()
-	title.text = "UO Arena"
-	title.add_theme_font_size_override("font_size", 34)
-	title.add_theme_color_override("font_color", Palette.MANTRA)
-	panel.add_child(title)
-
-	var hint := Label.new()
-	hint.text = "Enter the address of a server, or practise on your own."
-	hint.add_theme_color_override("font_color", Palette.CAST_FIZZLED)
-	panel.add_child(hint)
-
-	_address = LineEdit.new()
-	_address.text = DEFAULT_ADDRESS
-	_address.custom_minimum_size = Vector2(300.0, 0.0)
-	_address.text_submitted.connect(func(text: String) -> void: _connect_to(text))
-	panel.add_child(_address)
-
-	_connect_button = Button.new()
-	_connect_button.text = "Connect"
-	_connect_button.pressed.connect(func() -> void: _connect_to(_address.text))
-	panel.add_child(_connect_button)
-
-	var practice := Button.new()
-	practice.text = "Offline practice"
-	practice.pressed.connect(
-		func() -> void:
-			get_tree().change_scene_to_file("res://client/scenes/local_test.tscn")
-	)
-	panel.add_child(practice)
-
-	_status = Label.new()
-	_status.add_theme_color_override("font_color", Palette.CAST_INTERRUPTED)
-	panel.add_child(_status)
+func _go_to_practice() -> void:
+	if practice_scene != null:
+		get_tree().change_scene_to_packed(practice_scene)
+	else:
+		# A missing Inspector wiring should not strand the player on a dead button.
+		get_tree().change_scene_to_file("res://client/scenes/local_test.tscn")
 
 
 func _connect_to(address: String) -> void:

@@ -1,0 +1,22 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://client/arena_hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://client/cast_bar_ui.gd" id="2_cast_bar"]
+
+[node name="ArenaHud" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="CastBar" type="Control" parent="."]
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -80.0
+offset_right = 284.0
+offset_bottom = -64.0
+script = ExtResource("2_cast_bar")
+
+[node name="Readout" type="Label" parent="."]
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 24.0
+offset_bottom = 20.0

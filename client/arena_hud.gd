@@ -14,10 +14,16 @@ class_name ArenaHud
 ## the game does not look like. The moment the two HUDs diverge, that guarantee is
 ## quietly false and the preview is of the client nobody plays.
 ##
-## Kept flat in `client/` rather than given a `client/ui/` of its own on purpose:
-## `tests/test_palette.gd` walks `res://client` with `get_files()`, which does not
-## recurse, so a script in a subdirectory would silently stop being checked for raw hex
-## literals. Drawing code belongs where that check can see it.
+## The layout is authored in `client/scenes/arena_hud.tscn`, not built here — the
+## anchors and offsets live in the scene now. The script is kept flat in `client/`
+## rather than moved next to the scene: `tests/test_palette.gd` walks `res://client`
+## with `get_files()`, which does not recurse, so a script in a subdirectory would
+## silently stop being checked for raw hex literals. Drawing code belongs where that
+## check can see it.
+
+## The layout constants below still exist because `tests/test_arena_hud.gd` measures
+## the real nodes against them — the `.tscn` mirrors these exact numbers, and the
+## layout tests fail if the two drift.
 
 ## Distance in from the left edge. Shared, so the two rows line up down one margin.
 const MARGIN: float = 24.0
@@ -25,36 +31,24 @@ const MARGIN: float = 24.0
 const CAST_BAR_SIZE := Vector2(260.0, 16.0)
 
 ## How far the cast bar floats above the bottom edge. Anchored rather than positioned:
-## this used to be a y of 640, which is only the right answer while the viewport is
-## exactly 720 tall, and said nothing about the gap being the point.
+## a y of 640 is only the right answer while the viewport is exactly 720 tall, and says
+## nothing about the gap being the point.
 const CAST_BAR_BOTTOM_GAP: float = 64.0
 
 ## The readout hangs off the top-left corner, which is where a Control's origin already
-## is, so it needs no anchoring — a position is the honest way to say it.
+## is.
 const READOUT_TOP: float = 20.0
 
-var cast_bar: CastBarUI
-var readout: Label
+@onready var cast_bar: CastBarUI = $CastBar
+@onready var readout: Label = $Readout
 
 var _bound_state: EntityState
 
 
 func _ready() -> void:
-	cast_bar = CastBarUI.new()
-	cast_bar.anchor_left = 0.0
-	cast_bar.anchor_right = 0.0
-	cast_bar.anchor_top = 1.0
-	cast_bar.anchor_bottom = 1.0
-	cast_bar.offset_left = MARGIN
-	cast_bar.offset_right = MARGIN + CAST_BAR_SIZE.x
-	cast_bar.offset_top = -(CAST_BAR_BOTTOM_GAP + CAST_BAR_SIZE.y)
-	cast_bar.offset_bottom = -CAST_BAR_BOTTOM_GAP
-	add_child(cast_bar)
-
-	readout = Label.new()
-	readout.position = Vector2(MARGIN, READOUT_TOP)
+	# The one thing not in the scene: the colour goes through `client/palette.gd`, and a
+	# raw hex in a `.tres`/`.tscn` would slip past the palette check.
 	readout.add_theme_color_override("font_color", Palette.UI_TEXT)
-	add_child(readout)
 
 	# A binding asked for before the HUD entered the tree still has to land.
 	if _bound_state != null:

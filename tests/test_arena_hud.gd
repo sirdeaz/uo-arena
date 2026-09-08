@@ -9,12 +9,16 @@ extends TestCase
 ## perfect offline and show a dead cast bar in every networked fight — and nothing on
 ## screen distinguishes a bar that was never bound from one whose caster is simply idle.
 
+const HUD_SCENE := preload("res://client/scenes/arena_hud.tscn")
+
 var hud: ArenaHud
 var caster: Combatant
 
 
 func before_each() -> void:
-	hud = ArenaHud.new()
+	# The HUD is an authored scene now; its children exist only once it enters the tree,
+	# which is exactly the timing `bind_cast_bar` has to survive.
+	hud = HUD_SCENE.instantiate()
 	caster = Combatant.new()
 	add_child(caster)
 
