@@ -95,30 +95,34 @@ if [ "$want_linux" -eq 1 ]; then
     echo "Linux: build/UOArena-linux-x86_64.tar.gz ($(human_size build/UOArena-linux-x86_64.tar.gz))"
 fi
 
-# The dedicated-server build is meant to carry collision, not art. Preset 3 uses
-# `export_filter="all_resources"`, so tiny `.tres` metadata a client scene references
-# still rides along — that is bytes, not a problem. What must never appear is a client
-# *texture* (`client/art/*.png` / their `.ctex`): that is the weight, and it would mean
-# a scene has dragged real art into the server's graph. `--headless` would still run
-# such a build. The app icon (`res://icon.svg`) is packed into every export and is fine.
-assert_server_pck_carries_no_client_textures() {
+# The dedicated-server build is meant to carry collision, not art. What must never
+# appear is the character art (`wizard.*`) or a ballooning PCK — a real bleed. The
+# arena's own tileset image (`Grass-01.png`, ~21 KB) rides along because the shared
+# `arena.tscn` references it as a hard dependency and `exclude_filter` cannot drop one;
+# that is a rounding error, not a bleed.
+assert_server_pck_stays_lean() {
     pck=$(ls build/server/*.pck 2>/dev/null | head -n1)
     if [ -z "$pck" ]; then
         echo "  error: no server PCK to check" >&2
         exit 1
     fi
-    hits=$(strings "$pck" | grep -iE 'client/art/[^"]*\.(png|ctex|webp|jpe?g)|Grass-01|wizard\.png' || true)
+    hits=$(strings "$pck" | grep -iP 'wizard\.(png|ctex)|client/art/(?!Grass-01)[^"]*\.(png|ctex|webp|jpe?g)' || true)
     if [ -n "$hits" ]; then
-        echo "  error: the dedicated-server PCK carries client textures:" >&2
+        echo "  error: the dedicated-server PCK carries character or extra client art:" >&2
         echo "$hits" | sort -u >&2
         exit 1
     fi
-    echo "Server PCK: no client textures ($(human_size "$pck"))"
+    bytes=$(wc -c < "$pck")
+    if [ "$bytes" -gt 2097152 ]; then
+        echo "  error: the dedicated-server PCK is ${bytes} bytes (> 2 MiB)" >&2
+        exit 1
+    fi
+    echo "Server PCK: $(human_size "$pck"), no character art"
 }
 
 if [ "$want_server" -eq 1 ]; then
     export_preset "Linux Dedicated Server" build/server
-    assert_server_pck_carries_no_client_textures
+    assert_server_pck_stays_lean
     echo "Server: build/server/UOArenaServer.x86_64"
 fi
 

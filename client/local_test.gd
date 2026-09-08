@@ -25,7 +25,10 @@ const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 @onready var _sight_line: Node2D = $Stage/SightLine
 @onready var _bolts: BoltLayer = $Stage/Bolts
 
-var map: ArenaMap
+## Painted-and-collided arena, authored in `res://arena/arena.tscn`, instanced as a
+## child of both this scene and the networked client's.
+@onready var map: ArenaMap = $Arena
+
 var player: Fighter
 var dummy: Fighter
 
@@ -34,9 +37,6 @@ var _last_event: String = ""
 
 
 func _ready() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
-	add_child(map)
-	($Stage/ArenaView as ArenaView).setup(map)
 	($Stage/Camera2D as Camera2D).make_current()
 	_sight_line.draw.connect(_draw_sight_line)
 

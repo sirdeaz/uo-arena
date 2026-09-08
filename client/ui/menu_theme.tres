@@ -1,25 +1,10 @@
-; Chrome theme for the join screen so its controls stop being stock engine grey (#19).
-; The colours mirror client/palette.gd — UI_PANEL #11141c, UI_BORDER #3a4050,
-; UI_TEXT #c8d0e0 — kept in sync by hand; the palette module stays the source of record.
-[gd_resource type="Theme" load_steps=6 format=3]
+[gd_resource type="Theme" format=3 uid="uid://dpao4d561iw07"]
 
-[sub_resource type="StyleBoxFlat" id="btn_normal"]
-bg_color = Color(0.0667, 0.0784, 0.1098, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.2275, 0.251, 0.3137, 1)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
+[sub_resource type="StyleBoxFlat" id="btn_hover"]
 content_margin_left = 12.0
 content_margin_top = 6.0
 content_margin_right = 12.0
 content_margin_bottom = 6.0
-
-[sub_resource type="StyleBoxFlat" id="btn_hover"]
 bg_color = Color(0.102, 0.1216, 0.1686, 1)
 border_width_left = 1
 border_width_top = 1
@@ -30,28 +15,28 @@ corner_radius_top_left = 2
 corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="btn_normal"]
 content_margin_left = 12.0
 content_margin_top = 6.0
 content_margin_right = 12.0
 content_margin_bottom = 6.0
+bg_color = Color(0.0667, 0.0784, 0.1098, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2275, 0.251, 0.3137, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [sub_resource type="StyleBoxFlat" id="btn_pressed"]
-bg_color = Color(0.0431, 0.051, 0.0745, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.2275, 0.251, 0.3137, 1)
-corner_radius_top_left = 2
-corner_radius_top_right = 2
-corner_radius_bottom_right = 2
-corner_radius_bottom_left = 2
 content_margin_left = 12.0
 content_margin_top = 6.0
 content_margin_right = 12.0
 content_margin_bottom = 6.0
-
-[sub_resource type="StyleBoxFlat" id="edit_normal"]
 bg_color = Color(0.0431, 0.051, 0.0745, 1)
 border_width_left = 1
 border_width_top = 1
@@ -62,37 +47,49 @@ corner_radius_top_left = 2
 corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="edit_focus"]
 content_margin_left = 8.0
 content_margin_top = 6.0
 content_margin_right = 8.0
 content_margin_bottom = 6.0
-
-[sub_resource type="StyleBoxFlat" id="edit_focus"]
 bg_color = Color(0.0431, 0.051, 0.0745, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.431, 0.776, 1.0, 1)
+border_color = Color(0.431, 0.776, 1, 1)
 corner_radius_top_left = 2
 corner_radius_top_right = 2
 corner_radius_bottom_right = 2
 corner_radius_bottom_left = 2
+
+[sub_resource type="StyleBoxFlat" id="edit_normal"]
 content_margin_left = 8.0
 content_margin_top = 6.0
 content_margin_right = 8.0
 content_margin_bottom = 6.0
+bg_color = Color(0.0431, 0.051, 0.0745, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.2275, 0.251, 0.3137, 1)
+corner_radius_top_left = 2
+corner_radius_top_right = 2
+corner_radius_bottom_right = 2
+corner_radius_bottom_left = 2
 
 [resource]
 Button/colors/font_color = Color(0.7843, 0.8157, 0.8784, 1)
 Button/colors/font_hover_color = Color(1, 1, 1, 1)
 Button/colors/font_pressed_color = Color(0.7843, 0.8157, 0.8784, 1)
-Button/styles/normal = SubResource("btn_normal")
-Button/styles/hover = SubResource("btn_hover")
-Button/styles/pressed = SubResource("btn_pressed")
 Button/styles/focus = SubResource("btn_hover")
+Button/styles/hover = SubResource("btn_hover")
+Button/styles/normal = SubResource("btn_normal")
+Button/styles/pressed = SubResource("btn_pressed")
 Label/colors/font_color = Color(0.7843, 0.8157, 0.8784, 1)
-LineEdit/colors/font_color = Color(0.7843, 0.8157, 0.8784, 1)
 LineEdit/colors/caret_color = Color(0.7843, 0.8157, 0.8784, 1)
-LineEdit/styles/normal = SubResource("edit_normal")
+LineEdit/colors/font_color = Color(0.7843, 0.8157, 0.8784, 1)
 LineEdit/styles/focus = SubResource("edit_focus")
+LineEdit/styles/normal = SubResource("edit_normal")

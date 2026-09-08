@@ -12,7 +12,7 @@ class_name PathFinder
 ##
 ## It is plain geometry on purpose — no navigation server, no baked mesh, nothing that
 ## needs a frame to settle — so a test can ask exactly the question the game asks without
-## rendering anything. That is the same reason `ArenaView.shape_polygon` is static, and
+## rendering anything. That is the same reason the arena is read from its tiles, and
 ## this reuses that converter rather than growing a second one: what the search routes
 ## around cannot then drift from what you see.
 ##
@@ -113,32 +113,19 @@ func find_path(from: Vector2, to: Vector2) -> PackedVector2Array:
 	return _search(points, start, goal, from_visible, to_visible)
 
 
-## Every solid thing in the arena, in world space: the cover pieces and the boundary
-## walls. Shapes are converted by `ArenaView.shape_polygon`, the same code the drawing
-## uses, so this covers the circles, capsules and convex polygons a cover piece is allowed
-## to be — not only the rectangles it happens to be today.
+## Every solid rectangle in the arena, in world space — cover and boundary walls alike,
+## as `ArenaMap.obstacle_rects()` reports them. The arena is tiled now, so these are the
+## same rectangles the tiles are painted over, tile-aligned; the routing graph is built
+## from exactly what the resolver raycasts against.
 static func obstacle_polygons(map: ArenaMap) -> Array[PackedVector2Array]:
 	var polygons: Array[PackedVector2Array] = []
-
-	var bodies: Array[Node] = []
-	bodies.append_array(map.get_cover_pieces())
-	bodies.append_array(map.get_node("Bounds").get_children())
-
-	for body in bodies:
-		if body is not StaticBody2D:
-			continue
-		var solid := body as StaticBody2D
-		for child in solid.get_children():
-			if child is not CollisionShape2D:
-				continue
-			var collision := child as CollisionShape2D
-			var points := ArenaView.shape_polygon(collision.shape)
-			if points.size() < 3:
-				continue
-			polygons.append(
-				_transformed(points, solid.transform * collision.transform)
-			)
-
+	for rect in map.obstacle_rects():
+		polygons.append(PackedVector2Array([
+			rect.position,
+			Vector2(rect.end.x, rect.position.y),
+			rect.end,
+			Vector2(rect.position.x, rect.end.y),
+		]))
 	return polygons
 
 

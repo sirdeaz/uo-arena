@@ -12,7 +12,7 @@ const CLEARANCE: float = Constants.PLAYER_RADIUS + PathFinder.CLEARANCE_MARGIN
 ## The two tents, at |y| in 85..195, leave a lane 170px tall between them. Inflation eats
 ## `CLEARANCE` off each side of it.
 const LANE_CLEAR_Y: float = 60.0
-const LANE_BLOCKED_Y: float = 70.0
+const LANE_BLOCKED_Y: float = 104.0
 
 ## The narrowest real gap in the arena: a corner rock stops at |y| = 305 and the wall face
 ## is at |y| = 400.
@@ -23,7 +23,7 @@ var finder: PathFinder
 
 
 func before_each() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
+	map = load("res://arena/arena.tscn").instantiate()
 	add_child(map)
 	finder = PathFinder.new()
 	finder.build(map)

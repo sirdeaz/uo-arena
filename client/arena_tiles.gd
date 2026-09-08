@@ -3,14 +3,14 @@ class_name ArenaTiles
 
 ## The cell arithmetic shared by the thing that paints the arena tiles and the test that
 ## checks them. Pulled out as plain static functions for the same reason
-## `ArenaView.shape_polygon` is: the painter and the check have to agree exactly, or the
+## the arena's own geometry lives in the paint: the reader and the check have to agree, or the
 ## check is worthless, and neither should need a scene tree to ask the question.
 ##
 ## A cell `c` covers the world-space square `[c * tile, c * tile + tile)` on each axis —
 ## the native `TileMapLayer` mapping when the layer sits at the origin, which is where
-## `client/scenes/arena_ground.tscn` puts it.
+## `res://arena/arena.tscn` puts it.
 
-const TILE: int = 16
+const TILE: int = 32
 
 
 ## Every cell a world-space rect touches, rounded outward to whole cells. Outward, never

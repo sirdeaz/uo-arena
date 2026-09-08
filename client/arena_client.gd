@@ -33,7 +33,9 @@ const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 ## Which peer this client is playing. Set before adding the node to the tree.
 var local_peer_id: int = 0
 
-var map: ArenaMap
+## Painted-and-collided arena, authored in `res://arena/arena.tscn` and instanced as a
+## child here. The server loads the same scene.
+@onready var map: ArenaMap = $Arena
 
 ## The camera, the sight-line layer, the bolt layer, the audio node, the HUD and the
 ## debug overlay all live in `client/scenes/arena_stage.tscn`, shared verbatim with the
@@ -58,12 +60,8 @@ var _seconds_since_input_sent: float = 0.0
 
 
 func _ready() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
-	add_child(map)
-	($Stage/ArenaView as ArenaView).setup(map)
-
 	# Fixed at the origin: at 0.85 zoom a 1280×720 window shows 1506×847, and the arena
-	# is 1200×800, so all ten players are always on screen and nothing has to follow.
+	# fits inside that, so all ten players are always on screen and nothing has to follow.
 	($Stage/Camera2D as Camera2D).make_current()
 
 	_sight_line.draw.connect(_draw_sight_line)
