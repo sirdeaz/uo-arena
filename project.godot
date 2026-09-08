@@ -31,6 +31,10 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 
+[gui]
+
+theme/custom="res://client/ui/ui_theme.tres"
+
 [layer_names]
 
 2d_physics/layer_1="players"

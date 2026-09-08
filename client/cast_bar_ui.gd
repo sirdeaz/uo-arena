@@ -71,8 +71,10 @@ func _draw() -> void:
 		return
 
 	var track := Rect2(Vector2.ZERO, size)
+	# Font and size come from the project UI theme (`client/ui/ui_theme.tres`), not a
+	# hardcoded number and `ThemeDB`'s bundled fallback.
 	var font := get_theme_default_font()
-	var font_size := 15
+	var font_size := get_theme_default_font_size()
 
 	match _state.current_state:
 		EntityState.State.CASTING:
