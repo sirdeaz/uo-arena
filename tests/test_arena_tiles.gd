@@ -126,6 +126,31 @@ func test_the_floor_layer_carries_no_cover() -> void:
 		)
 
 
+# ── the tilemap sits where the colliders do ──────────────────────────────────
+
+func test_both_client_scenes_seat_the_ground_at_the_origin() -> void:
+	# The colliders load at the origin (server + both clients). The tilemap is a child
+	# of each client scene, and `client/arena_tiles.gd` assumes it sits at the origin
+	# too. A per-instance transform on that child slides every tile off its collider —
+	# invisible cover — and the standalone-scene load above cannot see it because it
+	# never opens a client scene. `instantiate()` alone does not run `_ready()`, so
+	# this stays cheap.
+	for scene_path in [
+		"res://client/scenes/arena_client.tscn", "res://client/scenes/local_test.tscn"
+	]:
+		var root: Node = load(scene_path).instantiate()
+		var ground_node := root.get_node_or_null("ArenaGround")
+		assert_true(ground_node != null, "%s has no ArenaGround child" % scene_path)
+		if ground_node != null:
+			assert_true(
+				ground_node.transform.is_equal_approx(Transform2D.IDENTITY),
+				"%s transforms ArenaGround (%s) — tiles will not sit on the colliders" % [
+					scene_path, ground_node.transform
+				]
+			)
+		root.free()
+
+
 # ── the cell arithmetic itself ───────────────────────────────────────────────
 
 func test_rect_cells_rounds_outward_never_short() -> void:
