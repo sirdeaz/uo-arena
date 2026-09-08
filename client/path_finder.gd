@@ -306,14 +306,6 @@ static func _centroid(polygon: PackedVector2Array) -> Vector2:
 	return sum / float(polygon.size())
 
 
-static func _transformed(
-	points: PackedVector2Array, xform: Transform2D
-) -> PackedVector2Array:
-	var out := PackedVector2Array()
-	for point in points:
-		out.append(xform * point)
-	return out
-
 
 # ── Search ────────────────────────────────────────────────────────────────────────
 

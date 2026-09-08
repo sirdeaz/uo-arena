@@ -15,7 +15,6 @@ extends TestCase
 
 const HALF_W := ArenaMap.HALF_WIDTH
 const HALF_H := ArenaMap.HALF_HEIGHT
-const TILE := ArenaMap.TILE
 
 var map: ArenaMap
 var walls: TileMapLayer
@@ -40,6 +39,19 @@ func _is_solid(layer: TileMapLayer, cell: Vector2i) -> bool:
 	return data != null and data.get_custom_data("solid")
 
 
+## Every cell a tile-aligned world rect covers, from the layer's own `local_to_map` —
+## the arena is painted on whole cells, so the corners map exactly and there is no
+## rounding to get wrong.
+func _cells_in(layer: TileMapLayer, rect: Rect2) -> Array:
+	var lo := layer.local_to_map(rect.position)
+	var hi := layer.local_to_map(rect.end)
+	var cells := []
+	for y in range(lo.y, hi.y):
+		for x in range(lo.x, hi.x):
+			cells.append(Vector2i(x, y))
+	return cells
+
+
 func _solid_cells() -> Dictionary:
 	var cells := {}
 	for layer in [walls, cover]:
@@ -53,7 +65,7 @@ func _solid_cells() -> Dictionary:
 
 func test_the_play_area_has_a_floor_tile_everywhere() -> void:
 	var play := Rect2(Vector2(-HALF_W, -HALF_H), Vector2(HALF_W * 2.0, HALF_H * 2.0))
-	for cell in ArenaTiles.rect_cells(play, TILE):
+	for cell in _cells_in(floor_layer, play):
 		assert_true(
 			floor_layer.get_cell_tile_data(cell) != null,
 			"cell %s in the play area has no floor tile" % cell
@@ -116,7 +128,7 @@ func test_obstacle_rects_fold_the_solid_cells_back_losslessly() -> void:
 	var covered := {}
 	for rect in map.obstacle_rects():
 		assert_true(rect.size.x > 0.0 and rect.size.y > 0.0, "obstacle rect %s has no area" % rect)
-		for cell in ArenaTiles.rect_cells(rect, TILE):
+		for cell in _cells_in(walls, rect):
 			assert_false(covered.has(cell), "cell %s is in two obstacle rects" % cell)
 			covered[cell] = true
 	assert_eq(covered.size(), solid.size(), "the merged rects cover a different cell count")
@@ -151,18 +163,3 @@ func test_the_arena_scene_carries_no_rendering_into_the_server_build() -> void:
 		)
 		stack.append_array(node.get_children())
 
-
-# ── the cell arithmetic itself ───────────────────────────────────────────────
-
-func test_rect_cells_rounds_outward_never_short() -> void:
-	# A rect whose edges fall mid-cell must still include the cells those edges are in.
-	var rect := Rect2(Vector2(-20.0, 4.0), Vector2(40.0, 40.0))  # x -20..20, y 4..44
-	var cells := ArenaTiles.rect_cells(rect, 16)
-	assert_true(cells.has(Vector2i(-2, 0)), "the left edge at x=-20 is in column -2")
-	assert_true(cells.has(Vector2i(1, 2)), "the bottom-right at (20, 44) is in cell (1, 2)")
-	for cell in cells:
-		var c := ArenaTiles.cell_centre(cell, 16)
-		assert_true(
-			c.x > rect.position.x - 16.0 and c.x < rect.end.x + 16.0,
-			"cell %s is more than a tile outside the rect" % cell
-		)

@@ -1,11 +1,13 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
+[ext_resource type="Script" path="res://client/scenes/arena_stage.gd" id="0_stage"]
 [ext_resource type="Script" path="res://server/combat_resolver.gd" id="1_resolver"]
 [ext_resource type="Script" path="res://client/bolt_layer.gd" id="2_bolts"]
 [ext_resource type="Script" path="res://client/spell_audio.gd" id="3_audio"]
 [ext_resource type="PackedScene" path="res://client/scenes/arena_hud.tscn" id="4_hud"]
 
 [node name="Stage" type="Node2D"]
+script = ExtResource("0_stage")
 
 [node name="Camera2D" type="Camera2D" parent="."]
 zoom = Vector2(0.85, 0.85)

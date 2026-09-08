@@ -41,6 +41,7 @@ var local_peer_id: int = 0
 ## debug overlay all live in `client/scenes/arena_stage.tscn`, shared verbatim with the
 ## practice harness — the "looks exactly like the practice one" promise is one authored
 ## scene now, not two `_ready()` methods kept identical by hand.
+@onready var _stage: ArenaStage = $Stage
 @onready var hud: ArenaHud = $Stage/ArenaHud
 
 ## Used for the sight line only. The server does its own raycasting and this one has no
@@ -273,7 +274,7 @@ func _add_fighter(peer_id: int, color: Color) -> void:
 	fighter.player_controlled = peer_id == local_peer_id
 	add_child(fighter)
 	_fighters[peer_id] = fighter
-	_connect_audio(fighter)
+	_stage.connect_fighter_audio(fighter)
 
 	if peer_id == local_peer_id:
 		# Bound once, for the life of the connection. Dying moves this fighter rather
@@ -285,21 +286,6 @@ func _add_fighter(peer_id: int, color: Color) -> void:
 ## same four signals a local one does — `apply_remote_state` and `emit_remote_event`
 ## replay them — so hearing an enemy start a cast, and hearing your own fizzle while you
 ## are watching the sight line rather than your feet, needs no networking of its own.
-func _connect_audio(fighter: Fighter) -> void:
-	var state := fighter.combatant.entity_state
-	state.cast_started.connect(
-		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_START)
-	)
-	state.cast_completed.connect(
-		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_RELEASE)
-	)
-	state.cast_fizzled.connect(
-		func(_spell: SpellData, _reason: String) -> void: audio.play(SpellAudio.Cue.FIZZLE)
-	)
-	state.cast_interrupted.connect(
-		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.INTERRUPT)
-	)
-
 
 func _remove_fighter(peer_id: int) -> void:
 	_fighters[peer_id].queue_free()
@@ -333,13 +319,6 @@ func _has_line_of_sight_to_target() -> bool:
 	)
 
 
-func _describe(state: EntityState) -> String:
-	var described: String = EntityState.State.keys()[state.current_state]
-	described = described.to_lower()
-	if state.current_spell != null:
-		described += " " + state.current_spell.spell_name
-	return described
-
 
 func _update_hud() -> void:
 	var lines := [
@@ -357,13 +336,13 @@ func _update_hud() -> void:
 		return
 
 	lines.append("you %d — %s" % [
-		roundi(fighter.combatant.health), _describe(fighter.combatant.entity_state)
+		roundi(fighter.combatant.health), ArenaStage.describe(fighter.combatant.entity_state)
 	])
 
 	if _fighters.has(_target_peer):
 		var target: Fighter = _fighters[_target_peer]
 		lines.append("target %d — %s" % [
-			roundi(target.combatant.health), _describe(target.combatant.entity_state)
+			roundi(target.combatant.health), ArenaStage.describe(target.combatant.entity_state)
 		])
 		lines.append(
 			"line of sight: %s" % ("CLEAR" if _has_line_of_sight_to_target() else "BLOCKED")
@@ -388,45 +367,18 @@ func _draw_sight_line() -> void:
 
 	if _fighters.has(_target_peer):
 		var target: Fighter = _fighters[_target_peer]
-		# Whether there is a shot is a spatial fact, so it is drawn spatially — solid
-		# when the line is live, dashed when cover has broken it. Same vocabulary the
-		# practice harness uses.
-		if _has_line_of_sight_to_target():
-			_sight_line.draw_line(
-				fighter.position,
-				target.position,
-				Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_CLEAR_ALPHA),
-				2.0
-			)
-		else:
-			_sight_line.draw_dashed_line(
-				fighter.position,
-				target.position,
-				Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_BLOCKED_ALPHA),
-				2.0,
-				Palette.SIGHT_LINE_DASH
-			)
+		ArenaStage.draw_sight_line(
+			_sight_line, fighter.position, target.position, _has_line_of_sight_to_target()
+		)
 
 		# Who you have selected, in their own body colour — the ring is that player,
 		# picked out, not a new thing to learn.
 		_sight_line.draw_arc(
-			target.position,
-			Constants.PLAYER_RADIUS + 6.0,
-			0.0,
-			TAU,
-			24,
-			target.body_color,
-			2.0,
-			true
+			target.position, Constants.PLAYER_RADIUS + 6.0, 0.0, TAU, 24,
+			target.body_color, 2.0, true
 		)
 
-	# Where you are steering, while the move button is down.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-		var cursor := _sight_line.get_global_mouse_position()
-		_sight_line.draw_arc(
-			cursor, 9.0, 0.0, TAU, 20,
-			Color(Palette.PLAYER, Palette.STEER_CURSOR_ALPHA), 2.0, true
-		)
-		_sight_line.draw_line(
-			fighter.position, cursor, Color(Palette.PLAYER, Palette.STEER_LINE_ALPHA), 1.0
+		ArenaStage.draw_steer_cursor(
+			_sight_line, fighter.position, _sight_line.get_global_mouse_position()
 		)
