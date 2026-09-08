@@ -95,27 +95,28 @@ if [ "$want_linux" -eq 1 ]; then
     echo "Linux: build/UOArena-linux-x86_64.tar.gz ($(human_size build/UOArena-linux-x86_64.tar.gz))"
 fi
 
-# The dedicated-server build is meant to carry collision and no art. Nothing in
-# `server/` references a texture today, so this is a regression guard: if a future scene
-# drags `client/art/` into the server's dependency graph, the PCK grows a megabyte of
-# grass and the "collision only" promise quietly breaks. `--headless` would still run it.
-assert_server_pck_has_no_textures() {
+# The dedicated-server build is meant to carry collision and no art. This is a
+# regression guard: if a future scene drags `client/art/` into the server's dependency
+# graph, the PCK grows a megabyte of grass and the "collision only" promise quietly
+# breaks — `--headless` would still run it. The app icon (`res://icon.svg`) is packed
+# into every export and is fine; what must never appear is anything under `client/art/`.
+assert_server_pck_carries_no_client_art() {
     pck=$(ls build/server/*.pck 2>/dev/null | head -n1)
     if [ -z "$pck" ]; then
-        echo "  error: no server PCK to check for textures" >&2
+        echo "  error: no server PCK to check" >&2
         exit 1
     fi
-    if strings "$pck" | grep -qiE '\.(png|ctex|webp|jpg|jpeg|svg)$'; then
-        echo "  error: the dedicated-server PCK contains texture files:" >&2
-        strings "$pck" | grep -iE '\.(png|ctex|webp|jpg|jpeg|svg)$' | sort -u >&2
+    if strings "$pck" | grep -qE 'client/art/|Grass-01|wizard\.(png|tres)'; then
+        echo "  error: the dedicated-server PCK carries client art:" >&2
+        strings "$pck" | grep -E 'client/art/|Grass-01|wizard\.(png|tres)' | sort -u >&2
         exit 1
     fi
-    echo "Server PCK: no textures ($(human_size "$pck"))"
+    echo "Server PCK: no client art ($(human_size "$pck"))"
 }
 
 if [ "$want_server" -eq 1 ]; then
     export_preset "Linux Dedicated Server" build/server
-    assert_server_pck_has_no_textures
+    assert_server_pck_carries_no_client_art
     echo "Server: build/server/UOArenaServer.x86_64"
 fi
 

@@ -74,24 +74,26 @@ jobs:
       - name: Run tests
         run: godot --headless res://tests/test_main.tscn -- --test
 
-      - name: Export the dedicated server and check it carries no art
-        # `server/` is meant to export as collision only. Nothing references a texture
-        # today, so this is a regression guard: a scene that drags `client/art/` into the
+      - name: Export the dedicated server and check it carries no client art
+        # `server/` is meant to export as collision only. This is a regression guard: a
+        # scene that drags `client/art/` (the tileset, the wizard sprite) into the
         # server's dependency graph would bloat the PCK and break the "collision only"
-        # promise silently — `--headless` would still run it. Preset 3 is otherwise built
-        # by nothing in CI.
+        # promise silently — `--headless` would still run it. The app icon
+        # (`res://icon.svg`) is packed into every export and is fine; what must never
+        # appear is anything under `client/art/`. Preset 3 is otherwise built by nothing
+        # in CI.
         run: |
           set -euo pipefail
           mkdir -p build/server
           godot --headless --export-release "Linux Dedicated Server" \
             build/server/UOArenaServer.x86_64
           pck=$(ls build/server/*.pck | head -n1)
-          if strings "$pck" | grep -qiE '\.(png|ctex|webp|jpg|jpeg|svg)$'; then
-            echo "::error::the dedicated-server PCK contains texture files:"
-            strings "$pck" | grep -iE '\.(png|ctex|webp|jpg|jpeg|svg)$' | sort -u
+          if strings "$pck" | grep -qE 'client/art/|Grass-01|wizard\.(png|tres)'; then
+            echo "::error::the dedicated-server PCK carries client art:"
+            strings "$pck" | grep -E 'client/art/|Grass-01|wizard\.(png|tres)' | sort -u
             exit 1
           fi
-          echo "server PCK carries no textures ($(wc -c < "$pck") bytes)"
+          echo "server PCK carries no client art ($(wc -c < "$pck") bytes)"
 
       - name: Export web build
         run: |
