@@ -32,8 +32,13 @@ var _no_go: Array[PackedVector2Array] = []
 
 
 func before_each() -> void:
-	_map = load("res://server/arena_map.tscn").instantiate()
+	_map = load("res://arena/arena.tscn").instantiate()
 	add_child(_map)
+	# The arena is collided by `TileMapLayer` tiles now, and their physics bodies are
+	# built on the first physics step — not synchronously on `add_child` the way the old
+	# `StaticBody2D` cover was. Without this wait `move_and_slide` walks straight through
+	# every tent.
+	await get_tree().physics_frame
 	_finder = PathFinder.new()
 	_finder.build(_map)
 
@@ -172,11 +177,12 @@ func test_a_walk_that_lands_astride_a_corner_still_gets_past_it() -> void:
 func _crossings() -> Array:
 	var reach := 170.0
 	var pairs := []
-	for piece in _map.get_cover_pieces():
+	for rect in _map.cover_rects():
+		var centre := rect.get_center()
 		for octant in 8:
 			var heading := Vector2.RIGHT.rotated(TAU * octant / 8.0)
-			var from: Vector2 = piece.position + heading * reach
-			var cursor: Vector2 = piece.position - heading * reach
+			var from: Vector2 = centre + heading * reach
+			var cursor: Vector2 = centre - heading * reach
 			if not _standable(from) or not _standable(cursor):
 				continue
 			if _finder.segment_is_walkable(from, cursor):

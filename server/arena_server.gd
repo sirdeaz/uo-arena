@@ -57,7 +57,7 @@ var _snapshot_accumulator: float = 0.0
 
 
 func _ready() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
+	map = load("res://arena/arena.tscn").instantiate()
 	add_child(map)
 	_spawns = map.get_spawn_positions()
 

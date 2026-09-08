@@ -1,52 +1,39 @@
 extends TestCase
 
-## The arena floor, boundary and cover are painted tiles now
-## (`client/scenes/arena_ground.tscn`), and collision stayed exactly where it was in
-## `server/arena_map.tscn`. That split is only safe while the two agree, and nothing in
-## the engine notices when they drift:
+## The arena is one authored scene now (`res://arena/arena.tscn`) — painted for looks
+## and collided for physics by the same `TileMapLayer`s, generated from the obstacle
+## rectangles in `arena/arena_map.gd` by `tools/build_arena.gd`. There is no second copy
+## to drift from, but the paint can still disagree with the rectangles the pathfinder
+## and the resolver read, and nothing in the engine notices:
 ##
-##  - a collider with no solid tile over it blocks spells and draws nothing — invisible
-##    cover, the worst bug this game has;
-##  - a solid-reading tile with no collider under it reads as shelter you can walk into
-##    and be shot through.
+##  - an obstacle rect with no solid tile over it blocks a raycast but the routing graph
+##    and the overlay draw nothing there — invisible cover, the worst bug this game has;
+##  - a solid tile with no rectangle under it reads as shelter a player walks into and
+##    is shot through.
 ##
-## Both are silent. This walks every collider from `PathFinder.obstacle_polygons`' own
-## source and asserts a solid tile sits over all of it — and that no solid tile sits in
-## open play more than a tile from anything that collides, the outward-rounding margin
-## the painter is allowed.
+## Both are silent. These pin the paint to `ArenaMap.obstacle_rects()`, and pin the
+## whole thing to its own 180° symmetry so a half-mirrored arena cannot pass.
 
 const HALF_W := ArenaMap.HALF_WIDTH
 const HALF_H := ArenaMap.HALF_HEIGHT
+const TILE := ArenaMap.TILE
 
 var map: ArenaMap
-var ground: Node2D
 var walls: TileMapLayer
 var cover: TileMapLayer
 var floor_layer: TileMapLayer
 
 
 func before_each() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
+	map = load("res://arena/arena.tscn").instantiate()
 	add_child(map)
-	ground = load("res://client/scenes/arena_ground.tscn").instantiate()
-	add_child(ground)
-	walls = ground.get_node("Walls")
-	cover = ground.get_node("Cover")
-	floor_layer = ground.get_node("Floor")
+	walls = map.get_node("Walls")
+	cover = map.get_node("Cover")
+	floor_layer = map.get_node("Floor")
 
 
 func after_each() -> void:
 	map.queue_free()
-	ground.queue_free()
-
-
-func _colliders() -> Array[StaticBody2D]:
-	var bodies: Array[StaticBody2D] = []
-	for body in map.get_node("Bounds").get_children():
-		bodies.append(body)
-	for body in map.get_cover_pieces():
-		bodies.append(body)
-	return bodies
 
 
 func _is_solid(layer: TileMapLayer, cell: Vector2i) -> bool:
@@ -63,92 +50,71 @@ func _solid_cells() -> Dictionary:
 	return cells
 
 
-# ── every collider is under a solid tile ──────────────────────────────────────
+# ── every obstacle rect is under solid tiles, and nothing solid floats free ────
 
-func test_every_collision_rect_is_fully_tiled() -> void:
+func test_every_obstacle_rect_is_fully_tiled() -> void:
 	var solid := _solid_cells()
-	for body in _colliders():
-		var rect := ArenaTiles.collider_world_rect(body)
-		assert_false(rect == Rect2(), "%s is not a rectangle collider" % body.name)
-		for cell in ArenaTiles.rect_cells(rect):
+	for rect in map.obstacle_rects():
+		for cell in ArenaTiles.rect_cells(rect, TILE):
 			assert_true(
 				solid.has(cell),
-				"%s: no solid tile over cell %s — that collider is invisible cover" % [
-					body.name, cell
-				]
+				"no solid tile over cell %s of obstacle %s — invisible cover" % [cell, rect]
 			)
 
 
-# ── no solid tile floats free in the play area ────────────────────────────────
-
-func test_no_solid_tile_sits_where_nothing_collides() -> void:
-	# Every in-bounds solid cell has to belong to some collider grown by one tile — the
-	# margin the painter rounds outward by. A solid cell further in than that is cover a
-	# player would walk into expecting shelter that is not there.
+func test_no_solid_tile_sits_where_no_obstacle_is() -> void:
 	var allowed := {}
-	for body in _colliders():
-		var grown := ArenaTiles.collider_world_rect(body).grow(ArenaTiles.TILE)
-		for cell in ArenaTiles.rect_cells(grown):
+	for rect in map.obstacle_rects():
+		for cell in ArenaTiles.rect_cells(rect, TILE):
 			allowed[cell] = true
 
 	for cell in _solid_cells():
-		var centre := ArenaTiles.cell_centre(cell)
-		var in_play := absf(centre.x) < HALF_W and absf(centre.y) < HALF_H
-		if not in_play:
-			continue  # the wall band is allowed to run out past the play edge
 		assert_true(
 			allowed.has(cell),
-			"solid tile at cell %s (world %s) is not over or beside any collider" % [
-				cell, centre
-			]
+			"solid tile at cell %s is over no obstacle rectangle" % cell
 		)
 
 
-# ── the floor is under the whole play area ────────────────────────────────────
+# ── the floor is decoration under the whole play area ─────────────────────────
 
 func test_the_play_area_has_a_floor_tile_everywhere() -> void:
-	var play := Rect2(
-		Vector2(-HALF_W, -HALF_H), Vector2(HALF_W * 2.0, HALF_H * 2.0)
-	)
-	for cell in ArenaTiles.rect_cells(play):
+	var play := Rect2(Vector2(-HALF_W, -HALF_H), Vector2(HALF_W * 2.0, HALF_H * 2.0))
+	for cell in ArenaTiles.rect_cells(play, TILE):
 		assert_true(
 			floor_layer.get_cell_tile_data(cell) != null,
 			"cell %s in the play area has no floor tile" % cell
 		)
 
 
-func test_the_floor_layer_carries_no_cover() -> void:
-	# The floor is decoration only. A solid tile on it would be a blocker the coverage
-	# checks above never look at.
+func test_the_floor_layer_carries_no_collision() -> void:
 	for cell in floor_layer.get_used_cells():
 		assert_false(
 			_is_solid(floor_layer, cell), "the floor layer has a solid tile at %s" % cell
 		)
 
 
-# ── the tilemap sits where the colliders do ──────────────────────────────────
+# ── the arena is its own 180° reflection ──────────────────────────────────────
 
-func test_both_client_scenes_seat_the_ground_at_the_origin() -> void:
-	# The colliders load at the origin (server + both clients). The tilemap is a child
-	# of each client scene, and `client/arena_tiles.gd` assumes it sits at the origin
-	# too. A per-instance transform on that child slides every tile off its collider —
-	# invisible cover — and the standalone-scene load above cannot see it because it
-	# never opens a client scene. `instantiate()` alone does not run `_ready()`, so
-	# this stays cheap.
-	for scene_path in [
-		"res://client/scenes/arena_client.tscn", "res://client/scenes/local_test.tscn"
-	]:
-		var root: Node = load(scene_path).instantiate()
-		var ground_node := root.get_node_or_null("ArenaGround")
-		assert_true(ground_node != null, "%s has no ArenaGround child" % scene_path)
-		if ground_node != null:
-			assert_true(
-				ground_node.transform.is_equal_approx(Transform2D.IDENTITY),
-				"%s transforms ArenaGround (%s) — tiles will not sit on the colliders" % [
-					scene_path, ground_node.transform
-				]
-			)
-		root.free()
+func test_the_solid_silhouette_is_rotationally_symmetric() -> void:
+	# Cover is placed so neither spawn is favoured. A mirrored-then-half-edited paint
+	# would pass every coverage check above and still hand one side the better ground.
+	var solid := _solid_cells()
+	for cell in solid:
+		var mirror := Vector2i(-cell.x - 1, -cell.y - 1)
+		assert_true(
+			solid.has(mirror),
+			"solid cell %s has no partner at %s — the arena is not 180° symmetric" % [cell, mirror]
+		)
+
+
+func test_the_spawns_are_their_own_negation() -> void:
+	var spawns := {}
+	for point in map.get_spawn_positions():
+		spawns[point] = true
+	for point in spawns:
+		assert_true(
+			spawns.has(-point), "spawn %s has no rotational partner at %s" % [point, -point]
+		)
 
 
 # ── the cell arithmetic itself ───────────────────────────────────────────────

@@ -21,7 +21,7 @@ var steering: PathSteering
 
 
 func before_each() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
+	map = load("res://arena/arena.tscn").instantiate()
 	add_child(map)
 	finder = PathFinder.new()
 	finder.build(map)

@@ -1,19 +1,18 @@
 extends Node2D
 class_name ArenaView
 
-## A developer overlay of the arena's true collision shapes, off by default.
+## A developer overlay of the arena's true collision, off by default.
 ##
-## The floor, the boundary and the cover are painted tiles now — `client/scenes/
-## arena_ground.tscn`, editable in the editor — and `tests/test_arena_tiles.gd` is what
-## guarantees a solid tile sits over every collider and nowhere else. That test replaced
-## the job this node used to do by drawing everything itself.
+## The arena is one painted-and-collided scene now — `res://arena/arena.tscn` — and
+## `tests/test_arena_tiles.gd` is what guarantees a solid tile sits over every obstacle
+## rectangle and nowhere else. That test replaced the job this node used to do by
+## drawing everything itself.
 ##
-## What stays here is the shape-to-outline conversion (`shape_polygon`), because
-## `client/path_finder.gd` routes around the very same polygons, and a switchable overlay
-## that draws those outlines so a mismatch between a collider and its tile can be seen
-## directly. Set `debug_shapes` true — from the remote inspector, or a one-line patch —
-## and every collision shape is outlined; anything this view cannot outline is still a
-## loud magenta placeholder rather than a silent gap.
+## Set `debug_shapes` true — from the remote inspector, or a one-line patch — and every
+## `ArenaMap.obstacle_rects()` rectangle is outlined over the tiles, so a paint that has
+## drifted from the collision can be seen directly. The `shape_polygon` / `can_draw`
+## statics stay because a test still pins them and they are the honest place to teach a
+## non-rectangular obstacle should one ever appear.
 
 const WALL_EDGE := Palette.WALL
 const COVER_EDGE := Palette.COVER_EDGE
@@ -43,18 +42,22 @@ func _draw() -> void:
 	if map == null or not debug_shapes:
 		return
 
-	for wall in map.get_node("Bounds").get_children():
-		_draw_body(wall, WALL_EDGE)
-	for piece in map.get_cover_pieces():
-		_draw_body(piece, COVER_EDGE)
+	for rect in map.obstacle_rects():
+		var walled := ArenaMap.cover_kind_at(rect.get_center()) == ArenaMap.CoverKind.UNKNOWN
+		var outline := PackedVector2Array([
+			rect.position,
+			Vector2(rect.end.x, rect.position.y),
+			rect.end,
+			Vector2(rect.position.x, rect.end.y),
+		])
+		draw_polyline(_closed(outline), WALL_EDGE if walled else COVER_EDGE, 1.0)
 
 
-func _draw_body(body: StaticBody2D, edge: Color) -> void:
-	for child in body.get_children():
-		if child is not CollisionShape2D:
-			continue
-		var collision := child as CollisionShape2D
-		_draw_shape(collision, body.transform * collision.transform, edge)
+static func _closed(points: PackedVector2Array) -> PackedVector2Array:
+	var loop := points.duplicate()
+	if loop.size() > 0:
+		loop.append(loop[0])
+	return loop
 
 
 # ── shapes ────────────────────────────────────────────────────────────────────

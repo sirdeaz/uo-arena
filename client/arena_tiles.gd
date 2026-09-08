@@ -8,9 +8,9 @@ class_name ArenaTiles
 ##
 ## A cell `c` covers the world-space square `[c * tile, c * tile + tile)` on each axis —
 ## the native `TileMapLayer` mapping when the layer sits at the origin, which is where
-## `client/scenes/arena_ground.tscn` puts it.
+## `res://arena/arena.tscn` puts it.
 
-const TILE: int = 16
+const TILE: int = 32
 
 
 ## Every cell a world-space rect touches, rounded outward to whole cells. Outward, never

@@ -12,7 +12,7 @@ var resolver: CombatResolver
 
 
 func before_each() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
+	map = load("res://arena/arena.tscn").instantiate()
 	add_child(map)
 	resolver = CombatResolver.new()
 	add_child(resolver)
@@ -60,8 +60,10 @@ func test_the_first_two_spawns_are_still_the_duel_lane() -> void:
 	# Several tests below read spawns[0] and spawns[1] as "the opening shot". Reordering
 	# the markers in the editor would quietly repoint them at some other pair.
 	var spawns := map.get_spawn_positions()
-	assert_eq(spawns[0], Vector2(-500.0, 0.0), "the west duel spawn moved")
-	assert_eq(spawns[1], Vector2(500.0, 0.0), "the east duel spawn moved")
+	# ±512, not ±500: the arena moved onto a 32-unit grid when the tiles took over the
+	# collision. The lane is still the centre line and still the first two markers.
+	assert_eq(spawns[0], Vector2(-512.0, 0.0), "the west duel spawn moved")
+	assert_eq(spawns[1], Vector2(512.0, 0.0), "the east duel spawn moved")
 
 
 func test_every_spawn_has_a_rotational_partner() -> void:
@@ -107,16 +109,19 @@ func test_spawns_do_not_overlap_each_other() -> void:
 
 
 func test_cover_pieces_are_within_the_planned_count() -> void:
-	var count := map.get_cover_pieces().size()
+	var count := map.cover_rects().size()
 	assert_true(count >= 3 and count <= 5, "expected 3-5 cover pieces, got %d" % count)
 
 
-func test_every_cover_piece_sits_on_the_obstacles_layer() -> void:
-	for piece in map.get_cover_pieces():
+func test_cover_tiles_sit_on_the_obstacles_layer() -> void:
+	# Collision comes from the tiles now. If their physics layer is not the obstacles
+	# bit, every LOS raycast and every `move_and_slide` ignores the cover.
+	for layer_name in ["Walls", "Cover"]:
+		var tile_set: TileSet = map.get_node(layer_name).tile_set
 		assert_eq(
-			piece.collision_layer & Constants.LAYER_OBSTACLES,
+			tile_set.get_physics_layer_collision_layer(0),
 			Constants.LAYER_OBSTACLES,
-			"%s must be on the obstacles layer or the raycast ignores it" % piece.name
+			"the %s tiles must collide on the obstacles layer" % layer_name
 		)
 
 

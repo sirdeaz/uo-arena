@@ -14,7 +14,7 @@ var map: ArenaMap
 
 
 func before_each() -> void:
-	map = load("res://server/arena_map.tscn").instantiate()
+	map = load("res://arena/arena.tscn").instantiate()
 	add_child(map)
 
 
@@ -32,26 +32,31 @@ func _collision_shapes(body: Node) -> Array[CollisionShape2D]:
 
 # ── nothing in the map is invisible ───────────────────────────────────────────
 
-func test_every_cover_shape_can_actually_be_drawn() -> void:
-	for piece in map.get_cover_pieces():
-		var shapes := _collision_shapes(piece)
-		assert_true(shapes.size() > 0, "%s has no collision shape at all" % piece.name)
-		for collision in shapes:
-			assert_true(
-				ArenaView.can_draw(collision.shape),
-				"%s is a %s, which ArenaView would draw as a placeholder — cover that blocks but is not drawn reads as a resolver bug" % [
-					piece.name,
-					"null shape" if collision.shape == null else collision.shape.get_class()
-				]
-			)
+func test_every_obstacle_is_a_real_rectangle_the_overlay_can_outline() -> void:
+	# Collision is the tiles now, and every obstacle the pathfinder and the overlay read
+	# is one of these rectangles. A zero-area or inverted one would be cover that blocks
+	# nothing, or a routing graph that trusts a degenerate polygon.
+	var rects := map.obstacle_rects()
+	assert_true(rects.size() >= 5, "walls plus cover should be at least five rectangles")
+	for rect in rects:
+		assert_true(
+			rect.size.x > 0.0 and rect.size.y > 0.0,
+			"obstacle rect %s has no area" % rect
+		)
 
 
-func test_every_boundary_wall_can_actually_be_drawn() -> void:
-	for wall in map.get_node("Bounds").get_children():
-		for collision in _collision_shapes(wall):
+func test_every_solid_tile_carries_a_collision_polygon() -> void:
+	# The tile *is* the collision. A solid-tagged tile with no physics polygon draws
+	# cover you can walk through and be shot past.
+	var tile_set: TileSet = map.get_node("Cover").tile_set
+	var source := tile_set.get_source(0) as TileSetAtlasSource
+	for i in source.get_tiles_count():
+		var coords := source.get_tile_id(i)
+		var data := source.get_tile_data(coords, 0)
+		if data.get_custom_data("solid"):
 			assert_true(
-				ArenaView.can_draw(collision.shape),
-				"%s would not be drawn" % wall.name
+				data.get_collision_polygons_count(0) > 0,
+				"solid tile %s has no collision polygon" % coords
 			)
 
 
@@ -106,30 +111,33 @@ func test_an_unhandled_shape_reports_itself_rather_than_claiming_it_can_be_drawn
 # ── tents read as tents ───────────────────────────────────────────────────────
 
 func test_every_cover_piece_declares_what_it_is() -> void:
-	# The game tells the player to get behind a *tent*. A piece with no kind still
-	# draws, but it draws as an anonymous block, so the instruction stops being true.
-	for piece in map.get_cover_pieces():
+	# The game tells the player to get behind a *tent*. A piece whose `kind` custom-data
+	# is missing draws as an anonymous block, so the instruction stops being true.
+	for rect in map.cover_rects():
 		assert_true(
-			ArenaMap.cover_kind(piece) != ArenaMap.CoverKind.UNKNOWN,
-			"%s has no cover_tent/cover_rock group, so it draws as a generic block" % piece.name
+			ArenaMap.cover_kind_at(rect.get_center()) != ArenaMap.CoverKind.UNKNOWN,
+			"cover at %s has no tent/rock kind, so it draws as a generic block" % rect.get_center()
 		)
 
 
 func test_tents_and_rocks_are_told_apart() -> void:
 	var kinds := {}
-	for piece in map.get_cover_pieces():
-		kinds[ArenaMap.cover_kind(piece)] = true
+	for rect in map.cover_rects():
+		kinds[ArenaMap.cover_kind_at(rect.get_center())] = true
 	assert_true(kinds.has(ArenaMap.CoverKind.TENT), "the arena has tents to hide behind")
 	assert_true(kinds.has(ArenaMap.CoverKind.ROCK), "the arena has rocks in the corners")
 
 
-func test_the_kind_hint_carries_no_rendering_into_the_server_scene() -> void:
-	# `server/` must stay exportable as a Dedicated Server build: collision only.
-	for piece in map.get_cover_pieces():
-		for child in piece.get_children():
-			assert_true(
-				child is CollisionShape2D,
-				"%s/%s is not a collision shape — server/ must hold no visuals" % [
-					piece.name, child.name
-				]
-			)
+func test_the_arena_scene_carries_no_rendering_into_the_server_build() -> void:
+	# `server/` loads this scene too. It may hold `TileMapLayer`s — that is the
+	# collision — but nothing that draws a texture: the Dedicated Server export drops
+	# the tileset image (checked in CI, see .github/workflows/deploy.yml) and the
+	# headless server runs the layers for physics alone.
+	var stack: Array[Node] = [map]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		assert_false(
+			node is Sprite2D or node is AnimatedSprite2D,
+			"%s is a sprite — the arena scene must not draw art the server would pack" % node.name
+		)
+		stack.append_array(node.get_children())
