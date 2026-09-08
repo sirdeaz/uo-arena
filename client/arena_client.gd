@@ -30,6 +30,9 @@ const INPUT_HEARTBEAT_SECONDS: float = 0.1
 ## `client/art/wizard.tres` and can be swapped in the editor.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 
+## Authored chrome — layout lives in the scene, not in `ArenaHud._ready()`.
+const HUD_SCENE := preload("res://client/scenes/arena_hud.tscn")
+
 ## Which peer this client is playing. Set before adding the node to the tree.
 var local_peer_id: int = 0
 
@@ -81,7 +84,7 @@ func _ready() -> void:
 	audio = SpellAudio.new()
 	add_child(audio)
 
-	hud = ArenaHud.new()
+	hud = HUD_SCENE.instantiate()
 	add_child(hud)
 
 

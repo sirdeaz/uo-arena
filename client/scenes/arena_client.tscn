@@ -1,10 +1,9 @@
-[gd_scene format=3 uid="uid://ck57lb62hcnew"]
+[gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" uid="uid://cuovkx1tm45yf" path="res://client/arena_client.gd" id="1_arena_client"]
+[ext_resource type="Script" path="res://client/arena_client.gd" id="1_arena_client"]
 [ext_resource type="PackedScene" path="res://client/scenes/arena_ground.tscn" id="2_ground"]
 
-[node name="ArenaClient" type="Node2D" unique_id=792816877]
+[node name="ArenaClient" type="Node2D"]
 script = ExtResource("1_arena_client")
 
-[node name="ArenaGround" parent="." unique_id=2119922269 instance=ExtResource("2_ground")]
-position = Vector2(262, 171)
+[node name="ArenaGround" parent="." instance=ExtResource("2_ground")]

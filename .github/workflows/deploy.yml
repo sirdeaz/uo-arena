@@ -74,6 +74,30 @@ jobs:
       - name: Run tests
         run: godot --headless res://tests/test_main.tscn -- --test
 
+      - name: Export the dedicated server and check it carries no client textures
+        # `server/` is meant to export as collision only. Preset 3 uses
+        # `export_filter="all_resources"`, so tiny `.tres` metadata that a client scene
+        # references (e.g. `grass_tileset.tres` stripped of its image) still rides along
+        # — that is bytes, not a problem. What must never appear is a client *texture*:
+        # `client/art/*.png` and their imported `.ctex`, which is where the weight is and
+        # which would mean a scene has dragged real art into the server's graph.
+        # `--headless` would still run such a build, so nothing else catches it — and
+        # preset 3 is built by nothing else in CI. The app icon (`res://icon.svg`) is
+        # packed into every export and is fine.
+        run: |
+          set -euo pipefail
+          mkdir -p build/server
+          godot --headless --export-release "Linux Dedicated Server" \
+            build/server/UOArenaServer.x86_64
+          pck=$(ls build/server/*.pck | head -n1)
+          hits=$(strings "$pck" | grep -iE 'client/art/[^"]*\.(png|ctex|webp|jpe?g)|Grass-01|wizard\.png' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::the dedicated-server PCK carries client textures:"
+            echo "$hits" | sort -u
+            exit 1
+          fi
+          echo "server PCK carries no client textures ($(wc -c < "$pck") bytes)"
+
       - name: Export web build
         run: |
           set -euo pipefail

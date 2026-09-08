@@ -46,6 +46,16 @@ const UI_BORDER := Color("#3a4050")
 ## HUD body text.
 const UI_TEXT := Color("#c8d0e0")
 
+## Secondary chrome text — hints, sub-labels on the join screen. A dim of the body text,
+## not a new hue: the convention is a named alpha for a variant of an existing signal.
+const UI_TEXT_DIM := Color(UI_TEXT, 0.62)
+
+## An error line in the chrome — "could not connect". Its own muted clay so it never
+## borrows off the cast-feedback axis (`CAST_FIZZLED` / `CAST_INTERRUPTED`), which is
+## the reuse #19 exists to remove, and clear of `HEALTH_HURT` — red still means one
+## thing, and it is not a menu.
+const UI_TEXT_ALERT := Color("#d89b7a")
+
 ## Near-black behind overhead text and bars, so they survive any floor under them.
 ## Also the shadow a fighter stands in — the same job, one layer down: it is what sets
 ## the character off the floor rather than a colour of its own.

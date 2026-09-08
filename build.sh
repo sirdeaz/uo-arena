@@ -95,8 +95,30 @@ if [ "$want_linux" -eq 1 ]; then
     echo "Linux: build/UOArena-linux-x86_64.tar.gz ($(human_size build/UOArena-linux-x86_64.tar.gz))"
 fi
 
+# The dedicated-server build is meant to carry collision, not art. Preset 3 uses
+# `export_filter="all_resources"`, so tiny `.tres` metadata a client scene references
+# still rides along — that is bytes, not a problem. What must never appear is a client
+# *texture* (`client/art/*.png` / their `.ctex`): that is the weight, and it would mean
+# a scene has dragged real art into the server's graph. `--headless` would still run
+# such a build. The app icon (`res://icon.svg`) is packed into every export and is fine.
+assert_server_pck_carries_no_client_textures() {
+    pck=$(ls build/server/*.pck 2>/dev/null | head -n1)
+    if [ -z "$pck" ]; then
+        echo "  error: no server PCK to check" >&2
+        exit 1
+    fi
+    hits=$(strings "$pck" | grep -iE 'client/art/[^"]*\.(png|ctex|webp|jpe?g)|Grass-01|wizard\.png' || true)
+    if [ -n "$hits" ]; then
+        echo "  error: the dedicated-server PCK carries client textures:" >&2
+        echo "$hits" | sort -u >&2
+        exit 1
+    fi
+    echo "Server PCK: no client textures ($(human_size "$pck"))"
+}
+
 if [ "$want_server" -eq 1 ]; then
     export_preset "Linux Dedicated Server" build/server
+    assert_server_pck_carries_no_client_textures
     echo "Server: build/server/UOArenaServer.x86_64"
 fi
 

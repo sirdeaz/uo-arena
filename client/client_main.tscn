@@ -1,6 +1,39 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://client/client_main.gd" id="1_client_main"]
+[ext_resource type="Theme" path="res://client/ui/menu_theme.tres" id="2_theme"]
+[ext_resource type="PackedScene" path="res://client/scenes/local_test.tscn" id="3_practice"]
 
 [node name="ClientMain" type="Node"]
 script = ExtResource("1_client_main")
+practice_scene = ExtResource("3_practice")
+
+[node name="Menu" type="CanvasLayer" parent="."]
+
+[node name="Panel" type="VBoxContainer" parent="Menu"]
+theme = ExtResource("2_theme")
+anchor_bottom = 1.0
+offset_left = 80.0
+offset_top = 140.0
+offset_right = 500.0
+offset_bottom = -140.0
+grow_vertical = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Menu/Panel"]
+text = "UO Arena"
+theme_override_font_sizes/font_size = 34
+
+[node name="Hint" type="Label" parent="Menu/Panel"]
+text = "Enter the address of a server, or practise on your own."
+
+[node name="Address" type="LineEdit" parent="Menu/Panel"]
+custom_minimum_size = Vector2(300, 0)
+
+[node name="ConnectButton" type="Button" parent="Menu/Panel"]
+text = "Connect"
+
+[node name="PracticeButton" type="Button" parent="Menu/Panel"]
+text = "Offline practice"
+
+[node name="Status" type="Label" parent="Menu/Panel"]

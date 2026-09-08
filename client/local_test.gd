@@ -16,6 +16,9 @@ const DUMMY_THINK_SECONDS: float = 0.9
 ## `client/art/wizard.tres` and can be swapped in the editor.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 
+## Authored chrome — layout lives in the scene, not in `ArenaHud._ready()`.
+const HUD_SCENE := preload("res://client/scenes/arena_hud.tscn")
+
 var map: ArenaMap
 var resolver: CombatResolver
 var player: Fighter
@@ -87,7 +90,7 @@ func _ready() -> void:
 	_connect_combat(player, dummy)
 	_connect_combat(dummy, player)
 
-	hud = ArenaHud.new()
+	hud = HUD_SCENE.instantiate()
 	add_child(hud)
 	hud.bind_cast_bar(player.combatant.entity_state)
 
@@ -155,7 +158,9 @@ func _run_dummy(delta: float) -> void:
 	if _dummy_think_timer < DUMMY_THINK_SECONDS:
 		return
 	_dummy_think_timer = 0.0
-	resolver.try_begin_cast(dummy.combatant, player.combatant, _spell("magic_arrow"))
+	resolver.try_begin_cast(
+		dummy.combatant, player.combatant, SpellBook.by_name("magic_arrow")
+	)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -187,10 +192,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not resolver.try_begin_cast(player.combatant, target, spell):
 		if not resolver.can_see(player.combatant, dummy.combatant):
 			_last_event = "%s — no line of sight" % spell.spell_name
-
-
-func _spell(spell_name: String) -> SpellData:
-	return load("res://common/spells/%s.tres" % spell_name)
 
 
 func _has_line_of_sight() -> bool:
