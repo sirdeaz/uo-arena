@@ -29,14 +29,15 @@ class_name Palette
 # The arena is painted from `client/art/Grass-01.png` now (see
 # `client/scenes/arena_ground.tscn`), so `FLOOR`, `COVER_FILL`, `TENT_DOOR` and the
 # `GRID` set below no longer reach a `_draw` call. They are kept as the written brief the
-# tileset was drawn to match, and as the colours the `ArenaView` developer overlay and
+# tileset was drawn to match, and as the colours
 # `tests/test_palette.gd` still read — not because anything renders them.
 
 const FLOOR := Color("#1b1f2a")
 const WALL := Color("#2b2f3a")
 const COVER_FILL := Color("#4a4234")
 
-## Still live: the outline colour the `ArenaView` debug overlay draws cover in.
+## The colour the arena's cover was drawn to read as. No code draws it now — the
+## tiles carry the look — but `tests/test_palette.gd` still holds the brief.
 const COVER_EDGE := Color("#8a7a5c")
 
 ## Backing for the cast bar, and the hairline around it.

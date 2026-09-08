@@ -37,7 +37,6 @@ var _last_event: String = ""
 
 
 func _ready() -> void:
-	($Stage/ArenaView as ArenaView).setup(map)
 	($Stage/Camera2D as Camera2D).make_current()
 	_sight_line.draw.connect(_draw_sight_line)
 

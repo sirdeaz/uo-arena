@@ -1,18 +1,17 @@
 extends TestCase
 
-## The arena is one authored scene now (`res://arena/arena.tscn`) — painted for looks
-## and collided for physics by the same `TileMapLayer`s, generated from the obstacle
-## rectangles in `arena/arena_map.gd` by `tools/build_arena.gd`. There is no second copy
-## to drift from, but the paint can still disagree with the rectangles the pathfinder
-## and the resolver read, and nothing in the engine notices:
+## The arena is one authored scene now (`res://arena/arena.tscn`) — hand-painted in the
+## editor, and read back by `ArenaMap`. Nothing describes the layout in code; these
+## check the paint is internally consistent, because a slip in it is silent:
 ##
-##  - an obstacle rect with no solid tile over it blocks a raycast but the routing graph
-##    and the overlay draw nothing there — invisible cover, the worst bug this game has;
-##  - a solid tile with no rectangle under it reads as shelter a player walks into and
-##    is shot through.
+##  - a solid tile with no collision polygon blocks nothing but the pathfinder still
+##    routes around it — invisible cover, the worst bug this game has, inverted;
+##  - a lone solid cell the rectangle merge cannot fold in would route players around
+##    empty ground;
+##  - a half-mirrored paint hands one spawn the better cover.
 ##
-## Both are silent. These pin the paint to `ArenaMap.obstacle_rects()`, and pin the
-## whole thing to its own 180° symmetry so a half-mirrored arena cannot pass.
+## `ArenaMap.obstacle_rects()` derives the routing rectangles from the same solid cells,
+## so it is checked here to fold them all back losslessly.
 
 const HALF_W := ArenaMap.HALF_WIDTH
 const HALF_H := ArenaMap.HALF_HEIGHT
@@ -48,31 +47,6 @@ func _solid_cells() -> Dictionary:
 			if _is_solid(layer, cell):
 				cells[cell] = true
 	return cells
-
-
-# ── every obstacle rect is under solid tiles, and nothing solid floats free ────
-
-func test_every_obstacle_rect_is_fully_tiled() -> void:
-	var solid := _solid_cells()
-	for rect in map.obstacle_rects():
-		for cell in ArenaTiles.rect_cells(rect, TILE):
-			assert_true(
-				solid.has(cell),
-				"no solid tile over cell %s of obstacle %s — invisible cover" % [cell, rect]
-			)
-
-
-func test_no_solid_tile_sits_where_no_obstacle_is() -> void:
-	var allowed := {}
-	for rect in map.obstacle_rects():
-		for cell in ArenaTiles.rect_cells(rect, TILE):
-			allowed[cell] = true
-
-	for cell in _solid_cells():
-		assert_true(
-			allowed.has(cell),
-			"solid tile at cell %s is over no obstacle rectangle" % cell
-		)
 
 
 # ── the floor is decoration under the whole play area ─────────────────────────
@@ -115,6 +89,67 @@ func test_the_spawns_are_their_own_negation() -> void:
 		assert_true(
 			spawns.has(-point), "spawn %s has no rotational partner at %s" % [point, -point]
 		)
+
+
+# ── the tiles are the collision, and the collision is not art ─────────────────
+
+func test_every_solid_tile_carries_a_collision_polygon() -> void:
+	# The tile *is* the collision now. A solid-tagged tile with no physics polygon is
+	# cover you walk through and are shot past.
+	for layer in [walls, cover]:
+		var tile_set: TileSet = layer.tile_set
+		var source := tile_set.get_source(0) as TileSetAtlasSource
+		for i in source.get_tiles_count():
+			var coords := source.get_tile_id(i)
+			var data := source.get_tile_data(coords, 0)
+			if data.get_custom_data("solid"):
+				assert_true(
+					data.get_collision_polygons_count(0) > 0,
+					"solid tile %s has no collision polygon" % coords
+				)
+
+
+func test_obstacle_rects_fold_the_solid_cells_back_losslessly() -> void:
+	# `obstacle_rects()` is the pathfinder's whole view of the arena. If the merge drops
+	# a cell the routing graph has a hole in it; if it invents one, a phantom wall.
+	var solid := _solid_cells()
+	var covered := {}
+	for rect in map.obstacle_rects():
+		assert_true(rect.size.x > 0.0 and rect.size.y > 0.0, "obstacle rect %s has no area" % rect)
+		for cell in ArenaTiles.rect_cells(rect, TILE):
+			assert_false(covered.has(cell), "cell %s is in two obstacle rects" % cell)
+			covered[cell] = true
+	assert_eq(covered.size(), solid.size(), "the merged rects cover a different cell count")
+	for cell in solid:
+		assert_true(covered.has(cell), "solid cell %s is in no obstacle rect" % cell)
+
+
+func test_cover_is_tents_and_rocks_and_the_boundary_is_neither() -> void:
+	var kinds := {}
+	for rect in map.cover_rects():
+		var kind := map.cover_kind_at(rect.get_center())
+		assert_true(
+			kind != ArenaMap.CoverKind.UNKNOWN,
+			"cover at %s has no tent/rock kind, so the client draws it as a block" % rect.get_center()
+		)
+		kinds[kind] = true
+	assert_true(kinds.has(ArenaMap.CoverKind.TENT), "the arena has tents to hide behind")
+	assert_true(kinds.has(ArenaMap.CoverKind.ROCK), "the arena has rocks in the corners")
+
+
+func test_the_arena_scene_carries_no_rendering_into_the_server_build() -> void:
+	# `server/` loads this scene too. `TileMapLayer`s are allowed — they are the
+	# collision — but nothing that draws a texture: the Dedicated Server export drops the
+	# tileset image (CI-checked, .github/workflows/deploy.yml) and the headless server
+	# runs the layers for physics alone.
+	var stack: Array[Node] = [map]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		assert_false(
+			node is Sprite2D or node is AnimatedSprite2D,
+			"%s is a sprite — the arena scene must not draw art the server would pack" % node.name
+		)
+		stack.append_array(node.get_children())
 
 
 # ── the cell arithmetic itself ───────────────────────────────────────────────

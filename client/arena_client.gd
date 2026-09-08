@@ -60,10 +60,8 @@ var _seconds_since_input_sent: float = 0.0
 
 
 func _ready() -> void:
-	($Stage/ArenaView as ArenaView).setup(map)
-
 	# Fixed at the origin: at 0.85 zoom a 1280×720 window shows 1506×847, and the arena
-	# is 1200×800, so all ten players are always on screen and nothing has to follow.
+	# fits inside that, so all ten players are always on screen and nothing has to follow.
 	($Stage/Camera2D as Camera2D).make_current()
 
 	_sight_line.draw.connect(_draw_sight_line)

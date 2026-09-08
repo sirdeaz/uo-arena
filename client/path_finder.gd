@@ -12,7 +12,7 @@ class_name PathFinder
 ##
 ## It is plain geometry on purpose — no navigation server, no baked mesh, nothing that
 ## needs a frame to settle — so a test can ask exactly the question the game asks without
-## rendering anything. That is the same reason `ArenaView.shape_polygon` is static, and
+## rendering anything. That is the same reason the arena is read from its tiles, and
 ## this reuses that converter rather than growing a second one: what the search routes
 ## around cannot then drift from what you see.
 ##
