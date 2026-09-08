@@ -60,9 +60,56 @@ errors for class names not yet registered.
   subclassing `TestCase`, discovered by `tests/test_main.gd`. Only four assertions exist
   and the message argument is mandatory — write it as why the behaviour matters.
 - **Pull the decision into a static function** so it can be tested without a scene tree.
-  This is the strongest convention in the codebase; `ArenaView.shape_polygon` and
-  `Fighter.movement_direction_toward` both exist in that shape for that reason.
-- **`server/` holds no rendering code**, so the Dedicated Server export stays clean.
+  This is the strongest convention in the codebase; `Fighter.movement_direction_toward`,
+  `ArenaServer.pick_spawn` and `FighterSprite.facing_for` all exist in that shape for
+  that reason. It survives the editor-first rule below — an authored node may *call* the
+  static, but the decision itself keeps no node reference.
+- **`server/` holds no rendering code**, so the Dedicated Server export stays lean. The
+  one seam is the shared arena scene: it references a `TileSet`, the server runs its
+  `TileMapLayer`s headless for collision, and CI builds the dedicated-server export and
+  fails if the character art leaks in or the PCK balloons (`.github/workflows/deploy.yml`).
+  `server/player_body.gd`'s collision body is physics, not rendering, and stays the
+  documented exception.
 - **Every colour goes through `client/palette.gd`.** One meaning per colour, and
   `tests/test_palette.gd` fails on a raw hex literal anywhere in `client/`. A variant of an
   existing signal should be a new named *alpha*, not a new hue.
+
+## Editor-first layout
+
+Standard Godot, assembled in the editor, is the default. Reach for code only where a
+test needs it — see the carve-outs below.
+
+- **Scenes and resources are `@export` or an authored child, not `load()`.** A scene a
+  node needs is instanced in the `.tscn` that owns it, or declared
+  `@export var thing: PackedScene` / `Resource` and wired in the Inspector.
+  `client/art/wizard.tres` on `FighterSprite`, and `practice_scene` on `client_main.gd`,
+  are the pattern. `load("res://…%s.tres")` string-building is the thing
+  `SpellBook.by_name` exists to kill. Tests and `tools/` are exempt — they are fixtures.
+- **Layout lives in `.tscn`.** The camera, view layers, HUD, join menu and audio nodes
+  are authored (`client/scenes/arena_stage.tscn`, `arena_hud.tscn`, `client_main.tscn`),
+  not built in `_ready()` with `.new()` + `add_child()` and pixel constants. Anchors, not
+  offsets against an assumed 1280×720.
+- **One authored scene, shared by both clients.** The networked client and the practice
+  harness instance the same `arena_stage.tscn` — never two parallel `_ready()` trees kept
+  identical by memory. They drifted once already (`ArenaGround.position`, #43).
+- **One arena scene for client and server.** `res://arena/arena.tscn` is hand-painted;
+  the tiles own the collision (a physics layer on the obstacles bit, `kind` custom-data
+  for tent/rock/wall). Nothing describes the layout in code — `arena/arena_map.gd` reads
+  it back: `obstacle_rects()` merges the solid cells, `cover_kind_at()` reads the tile.
+  Repaint the arena in the editor; the code adapts.
+- **Node Groups or TileSet custom-data name a role**, read by a helper — not an exported
+  "type" enum on every instance.
+
+### Carve-outs — these stay code, by name
+
+1. **The decision still goes in a static function** (see above). Authoring the node that
+   calls it changes nothing.
+2. **`autoload/network_manager.gd` is the only file that knows what an RPC is**, and
+   `common/net_protocol.gd` is the wire contract. `MultiplayerSpawner` /
+   `MultiplayerSynchronizer` are deliberately **not** adopted — they need a live peer and
+   bind replication to the tree, and the suite that gates the deploy runs the whole sim
+   with no socket.
+3. **`client/palette.gd` stays one flat `.gd` module in `client/`.**
+   `tests/test_palette.gd` walks `res://client` non-recursively for `Color("#`; a Theme
+   resource cannot carry the "one meaning per colour" checks or the rationale, and a
+   subfolder drops the script from the scan.
