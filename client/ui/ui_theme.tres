@@ -1,0 +1,15 @@
+; The project-wide UI theme. Applied via project.godot's `gui/theme/custom`, so every
+; Control — the cast bar, the HUD readout, the join menu — resolves its font and base
+; size through here rather than falling through to `ThemeDB`'s bundled default. Swapping
+; in a bundled UI face later is a one-line change to this file.
+;
+; The mantra face (Uncial) is deliberately not here — that is a character speaking, set
+; on `client/spell_visuals.gd`, and interface text is not.
+[gd_resource type="Theme" load_steps=2 format=3]
+
+[sub_resource type="SystemFont" id="SystemFont_ui"]
+font_names = PackedStringArray("Inter", "Noto Sans", "DejaVu Sans", "Arial", "sans-serif")
+
+[resource]
+default_font = SubResource("SystemFont_ui")
+default_font_size = 15

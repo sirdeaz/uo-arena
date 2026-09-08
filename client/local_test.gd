@@ -24,6 +24,7 @@ const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 @onready var audio: SpellAudio = $Stage/Audio
 @onready var _sight_line: Node2D = $Stage/SightLine
 @onready var _bolts: BoltLayer = $Stage/Bolts
+@onready var _stage: ArenaStage = $Stage
 
 ## Painted-and-collided arena, authored in `res://arena/arena.tscn`, instanced as a
 ## child of both this scene and the networked client's.
@@ -59,8 +60,8 @@ func _ready() -> void:
 	dummy.position = spawns[1]
 	add_child(dummy)
 
-	_connect_audio(player)
-	_connect_audio(dummy)
+	_stage.connect_fighter_audio(player)
+	_stage.connect_fighter_audio(dummy)
 
 	_connect_combat(player, dummy)
 	_connect_combat(dummy, player)
@@ -71,17 +72,6 @@ func _ready() -> void:
 ## Both fighters are audible. Hearing the enemy start a cast is the read the mantras
 ## give you visually, and hearing your own fizzle is the point of the whole system —
 ## it happens while you are watching the sight line, not your own feet.
-func _connect_audio(fighter: Fighter) -> void:
-	var state := fighter.combatant.entity_state
-	state.cast_started.connect(func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_START))
-	state.cast_completed.connect(func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.CAST_RELEASE))
-	state.cast_fizzled.connect(
-		func(_spell: SpellData, _reason: String) -> void: audio.play(SpellAudio.Cue.FIZZLE)
-	)
-	state.cast_interrupted.connect(
-		func(_spell: SpellData) -> void: audio.play(SpellAudio.Cue.INTERRUPT)
-	)
-
 
 func _connect_combat(from: Fighter, to: Fighter) -> void:
 	from.combatant.entity_state.cast_completed.connect(
@@ -173,16 +163,9 @@ func _has_line_of_sight() -> bool:
 	)
 
 
-func _describe(state: EntityState) -> String:
-	var name: String = EntityState.State.keys()[state.current_state]
-	var described := name.to_lower()
-	if state.current_spell != null:
-		described += " " + state.current_spell.spell_name
-	return described
-
 
 func _update_hud() -> void:
-	var status := _describe(player.combatant.entity_state)
+	var status := ArenaStage.describe(player.combatant.entity_state)
 
 	var lines := [
 		"hold RIGHT MOUSE to move toward the cursor    R reset    M %s    P pathing %s" % [
@@ -198,7 +181,7 @@ func _update_hud() -> void:
 		],
 		"line of sight: %s" % ("CLEAR" if _has_line_of_sight() else "BLOCKED"),
 		"you are: %s" % status,
-		"dummy is: %s" % _describe(dummy.combatant.entity_state),
+		"dummy is: %s" % ArenaStage.describe(dummy.combatant.entity_state),
 		_last_event,
 	]
 
@@ -218,34 +201,14 @@ func _draw_sight_line() -> void:
 	# there is a shot, dashed and faint when cover has broken it. It used to be
 	# green-versus-red, which meant the two most loaded colours on screen were being
 	# spent here as well as on health, poison and cast feedback.
-	if _has_line_of_sight():
-		_sight_line.draw_line(
-			player.position,
-			dummy.position,
-			Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_CLEAR_ALPHA),
-			2.0
-		)
-	else:
-		_sight_line.draw_dashed_line(
-			player.position,
-			dummy.position,
-			Color(Palette.SIGHT_LINE, Palette.SIGHT_LINE_BLOCKED_ALPHA),
-			2.0,
-			Palette.SIGHT_LINE_DASH
-		)
+	ArenaStage.draw_sight_line(
+		_sight_line, player.position, dummy.position, _has_line_of_sight()
+	)
 
 	# Where you are steering, while the move button is down.
-
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
 		var cursor := _sight_line.get_global_mouse_position()
-		_sight_line.draw_arc(
-			cursor, 9.0, 0.0, TAU, 20,
-			Color(Palette.PLAYER, Palette.STEER_CURSOR_ALPHA), 2.0, true
-		)
-		_sight_line.draw_line(
-			player.position, cursor,
-			Color(Palette.PLAYER, Palette.STEER_LINE_ALPHA), 1.0
-		)
+		ArenaStage.draw_steer_cursor(_sight_line, player.position, cursor)
 		_draw_route()
 
 
