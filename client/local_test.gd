@@ -16,43 +16,29 @@ const DUMMY_THINK_SECONDS: float = 0.9
 ## `client/art/wizard.tres` and can be swapped in the editor.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 
-## Authored chrome — layout lives in the scene, not in `ArenaHud._ready()`.
-const HUD_SCENE := preload("res://client/scenes/arena_hud.tscn")
+## The camera, the arena view, the sight-line layer, the bolt layer, the audio node and
+## the HUD all live in `client/scenes/arena_stage.tscn` — the same authored scene the
+## networked client instances, so the two cannot drift.
+@onready var resolver: CombatResolver = $Stage/Resolver
+@onready var hud: ArenaHud = $Stage/ArenaHud
+@onready var audio: SpellAudio = $Stage/Audio
+@onready var _sight_line: Node2D = $Stage/SightLine
+@onready var _bolts: BoltLayer = $Stage/Bolts
 
 var map: ArenaMap
-var resolver: CombatResolver
 var player: Fighter
 var dummy: Fighter
-var hud: ArenaHud
-var audio: SpellAudio
 
 var _dummy_think_timer: float = 0.0
 var _last_event: String = ""
 
-## Drawn above the arena floor — this node draws itself before its children, so the
-## sight line has to live on a layer of its own or the floor paints over it.
-var _sight_line: Node2D
-
-## Bolts and impacts for spells that connected. Blocked spells add nothing at all,
-## matching UO, where a spell you have no line to simply never goes off.
-var _bolts: BoltLayer
-
 
 func _ready() -> void:
-	resolver = CombatResolver.new()
-	add_child(resolver)
-
 	map = load("res://server/arena_map.tscn").instantiate()
 	add_child(map)
-
-	var view := ArenaView.new()
-	add_child(view)
-	view.setup(map)
-
-	var camera := Camera2D.new()
-	camera.zoom = Vector2(0.85, 0.85)
-	add_child(camera)
-	camera.make_current()
+	($Stage/ArenaView as ArenaView).setup(map)
+	($Stage/Camera2D as Camera2D).make_current()
+	_sight_line.draw.connect(_draw_sight_line)
 
 	var spawns := map.get_spawn_positions()
 
@@ -73,25 +59,12 @@ func _ready() -> void:
 	dummy.position = spawns[1]
 	add_child(dummy)
 
-	_sight_line = Node2D.new()
-	_sight_line.z_index = 5
-	add_child(_sight_line)
-	_sight_line.draw.connect(_draw_sight_line)
-
-	# Spell bolts get their own additive layer so they glow rather than tint.
-	_bolts = BoltLayer.new()
-	add_child(_bolts)
-
-	audio = SpellAudio.new()
-	add_child(audio)
 	_connect_audio(player)
 	_connect_audio(dummy)
 
 	_connect_combat(player, dummy)
 	_connect_combat(dummy, player)
 
-	hud = HUD_SCENE.instantiate()
-	add_child(hud)
 	hud.bind_cast_bar(player.combatant.entity_state)
 
 

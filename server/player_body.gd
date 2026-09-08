@@ -9,16 +9,10 @@ class_name PlayerBody
 ## collision body is physics. What it buys is worth the exception: the server slides
 ## along a tent using exactly the same code the client predicts with, so hugging cover
 ## does not manufacture a correction on every frame.
-
-
-func _ready() -> void:
-	collision_layer = Constants.LAYER_PLAYERS
-	# Obstacles only. Players pass through one another and never block a spell — the
-	# same choice `Fighter` makes, and the one `test_line_of_sight.gd` pins.
-	collision_mask = Constants.LAYER_OBSTACLES
-
-	var collision := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = Constants.PLAYER_RADIUS
-	collision.shape = circle
-	add_child(collision)
+##
+## Layout — the circle, its radius, and the collision layers — is authored in
+## `server/player_body.tscn` now, not built here. The `.tscn` mirrors
+## `Constants.PLAYER_RADIUS` / `LAYER_PLAYERS` / `LAYER_OBSTACLES` by hand;
+## `tests/test_player_body.gd` fails if the two drift. Obstacles only in the mask:
+## players pass through one another and never block a spell — the same choice `Fighter`
+## makes, and the one `test_line_of_sight.gd` pins.

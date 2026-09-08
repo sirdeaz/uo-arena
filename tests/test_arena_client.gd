@@ -7,12 +7,16 @@ extends TestCase
 const LOCAL := 2
 const OTHER := 3
 
+## The client is an authored scene now — camera, HUD and the view layers come from
+## `arena_stage.tscn`. `network_manager.gd` instances it the same way in a real match.
+const CLIENT_SCENE := preload("res://client/scenes/arena_client.tscn")
+
 var client: ArenaClient
 var source: Combatant
 
 
 func before_each() -> void:
-	client = ArenaClient.new()
+	client = CLIENT_SCENE.instantiate()
 	client.local_peer_id = LOCAL
 	add_child(client)
 
