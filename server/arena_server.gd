@@ -43,6 +43,11 @@ class Player extends RefCounted:
 	var request_window: float = 0.0
 
 
+## Authored so the collision circle and its layers are visible in the editor rather
+## than assembled in `PlayerBody._ready()`. Collision only — no texture, nothing from
+## `client/` — so the dedicated-server export stays clean.
+const PLAYER_BODY_SCENE := preload("res://server/player_body.tscn")
+
 var map: ArenaMap
 var resolver: CombatResolver
 
@@ -76,7 +81,7 @@ func add_player(peer_id: int) -> bool:
 	player.combatant = Combatant.new()
 	add_child(player.combatant)
 
-	player.body = PlayerBody.new()
+	player.body = PLAYER_BODY_SCENE.instantiate()
 	player.body.position = first_free_spawn(_spawns, _occupied_positions())
 	add_child(player.body)
 	player.combatant.position = player.body.position
