@@ -9,13 +9,11 @@ extends TestCase
 
 const CLEARANCE: float = Constants.PLAYER_RADIUS + PathFinder.CLEARANCE_MARGIN
 
-## The two tents, at |y| in 85..195, leave a lane 170px tall between them. Inflation eats
-## `CLEARANCE` off each side of it.
+## A horizontal line close to the spawn line, clear of every cover piece. The blocked
+## counterpart is read off the arena at test time — see `_a_horizontal_line_that_clips_cover`.
 const LANE_CLEAR_Y: float = 60.0
-const LANE_BLOCKED_Y: float = 104.0
 
-## The narrowest real gap in the arena: a corner rock stops at |y| = 305 and the wall face
-## is at |y| = 400.
+## The narrowest real gap the clearance margin has to fit through, with room to spare.
 const NARROWEST_GAP: float = 95.0
 
 var map: ArenaMap
@@ -128,10 +126,23 @@ func test_clearance_stays_well_under_the_narrowest_gap() -> void:
 
 
 func test_every_solid_thing_in_the_arena_becomes_an_obstacle() -> void:
-	# Four cover pieces and four walls. Missing the walls would let routes leave the map.
-	assert_eq(
-		PathFinder.obstacle_polygons(map).size(), 8, "four cover pieces and four walls"
-	)
+	# Whatever is painted with collision has to reach the routing graph — a cell the
+	# graph cannot see is one a route runs straight through.
+	var polygons := PathFinder.obstacle_polygons(map)
+	assert_true(polygons.size() >= 1, "the arena has cover, so the graph must have obstacles")
+	for node in [map.get_node("Walls"), map.get_node("Cover")]:
+		var layer: TileMapLayer = node
+		for cell in layer.get_used_cells():
+			var data := layer.get_cell_tile_data(cell)
+			if data == null or data.get_collision_polygons_count(0) == 0:
+				continue
+			var centre := layer.to_global(layer.map_to_local(cell))
+			var seen := false
+			for polygon in polygons:
+				if Geometry2D.is_point_in_polygon(centre, polygon):
+					seen = true
+					break
+			assert_true(seen, "painted cell at %s reached no obstacle polygon" % centre)
 
 
 func test_the_duel_lane_is_walkable_straight_down_the_middle() -> void:
@@ -148,20 +159,33 @@ func test_the_duel_lane_is_walkable_straight_down_the_middle() -> void:
 
 
 func test_the_duel_lane_survives_inflation() -> void:
-	# Pinned from both sides on purpose. Raise the clearance and the first assertion
-	# fails; drop it to nothing and the second one does.
+	# Pinned from both sides on purpose: the opening lane admits a real body, and a
+	# parallel line that runs into cover does not. Both y values are read off the arena
+	# rather than hard-coded, so a repaint moves them.
 	assert_true(
 		finder.segment_is_walkable(
 			Vector2(-500.0, LANE_CLEAR_Y), Vector2(500.0, LANE_CLEAR_Y)
 		),
-		"the lane between the tents must stay open to a real body"
+		"the lane between the spawns must stay open to a real body"
 	)
+	var blocked_y := _a_horizontal_line_that_clips_cover()
+	assert_true(blocked_y != INF, "the arena has cover on the way across, so some line must clip it")
 	assert_false(
-		finder.segment_is_walkable(
-			Vector2(-500.0, LANE_BLOCKED_Y), Vector2(500.0, LANE_BLOCKED_Y)
-		),
-		"and a line that clips a tent must not be called walkable"
+		finder.segment_is_walkable(Vector2(-500.0, blocked_y), Vector2(500.0, blocked_y)),
+		"a line that clips cover at y=%s must not be called walkable" % blocked_y
 	)
+
+
+## Sweeps horizontal lines across the arena and returns the first y whose crossing a real
+## body cannot make, or INF if the way is somehow all clear.
+func _a_horizontal_line_that_clips_cover() -> float:
+	var extent := map.bounds()
+	var y := extent.position.y + 8.0
+	while y < extent.end.y:
+		if not finder.segment_is_walkable(Vector2(-500.0, y), Vector2(500.0, y)):
+			return y
+		y += 8.0
+	return INF
 
 
 func test_a_route_around_a_tent_turns_a_corner_and_stays_clear() -> void:
