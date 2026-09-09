@@ -48,8 +48,14 @@ class Player extends RefCounted:
 ## `client/` — so the dedicated-server export stays clean.
 const PLAYER_BODY_SCENE := preload("res://server/player_body.tscn")
 
-var map: ArenaMap
-var resolver: CombatResolver
+## The `Arena` child instances `res://arena/arena.tscn` — the same hand-painted scene
+## the client scenes instance, never `load()`ed here. Authored in `server/arena_server.tscn`.
+@onready var map: ArenaMap = $Arena
+
+## Authored as the `Resolver` child. It raycasts through `get_viewport().get_world_2d()`,
+## so it has to hang off the running tree rather than float loose — which the scene
+## guarantees.
+@onready var resolver: CombatResolver = $Resolver
 
 var _players: Dictionary = {}
 var _spawns: Array[Vector2] = []
@@ -57,14 +63,7 @@ var _snapshot_accumulator: float = 0.0
 
 
 func _ready() -> void:
-	map = load("res://arena/arena.tscn").instantiate()
-	add_child(map)
 	_spawns = map.get_spawn_positions()
-
-	# The resolver raycasts through `get_viewport().get_world_2d()`, so it has to hang
-	# off the running tree rather than float loose.
-	resolver = CombatResolver.new()
-	add_child(resolver)
 
 
 # ── Roster ────────────────────────────────────────────────────────────────────────

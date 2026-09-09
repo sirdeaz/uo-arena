@@ -14,7 +14,7 @@ var resolutions: Array = []
 
 
 func before_each() -> void:
-	server = ArenaServer.new()
+	server = preload("res://server/arena_server.tscn").instantiate()
 	add_child(server)
 	server.spell_resolved.connect(
 		func(caster: int, target: int, spell_id: int, connected: bool) -> void:
