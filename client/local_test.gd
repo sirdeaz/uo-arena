@@ -12,10 +12,6 @@ extends Node2D
 
 const DUMMY_THINK_SECONDS: float = 0.9
 
-## A scene rather than `Fighter.new()` so the collision shape, the character's
-## `SpriteFrames` and the draw layers all come wired from `client/scenes/fighter.tscn`.
-const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
-
 ## The camera, the arena view, the sight-line layer, the bolt layer, the audio node and
 ## the HUD all live in `client/scenes/arena_stage.tscn` — the same authored scene the
 ## networked client instances, so the two cannot drift.
@@ -30,8 +26,11 @@ const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 ## child of both this scene and the networked client's.
 @onready var map: ArenaMap = $Arena
 
-var player: Fighter
-var dummy: Fighter
+## The two fighters this harness exists to show — instanced `fighter.tscn` children of
+## `client/scenes/local_test.tscn`, coloured and (for the player) flagged in the editor
+## as instance overrides. `capture_promo_shot.gd` reads them back by these names.
+@onready var player: Fighter = $Player
+@onready var dummy: Fighter = $Dummy
 
 var _dummy_think_timer: float = 0.0
 var _last_event: String = ""
@@ -41,24 +40,17 @@ func _ready() -> void:
 	($Stage/Camera2D as Camera2D).make_current()
 	_sight_line.draw.connect(_draw_sight_line)
 
+	# `arena.tscn`'s spawn markers stay the single source of truth for where the two
+	# fighters start; `capture_promo_shot` overrides both positions anyway.
 	var spawns := map.get_spawn_positions()
-
-	player = FIGHTER_SCENE.instantiate()
-	player.player_controlled = true
-	player.body_color = Palette.PLAYER
 	player.position = spawns[0]
-	add_child(player)
+	dummy.position = spawns[1]
 
-	# Built once from the map that was just added — the arena's geometry is fixed at load
-	# and nothing ever moves it. Off until you press P.
+	# Built once from the map — the arena's geometry is fixed at load and nothing ever
+	# moves it. Off until you press P.
 	var finder := PathFinder.new()
 	finder.build(map)
 	player.enable_pathfinding(finder)
-
-	dummy = FIGHTER_SCENE.instantiate()
-	dummy.body_color = Palette.DUMMY
-	dummy.position = spawns[1]
-	add_child(dummy)
 
 	_stage.connect_fighter_audio(player)
 	_stage.connect_fighter_audio(dummy)
