@@ -32,6 +32,27 @@ func test_a_scene_on_the_command_line_wins() -> void:
 	)
 
 
+func test_the_editors_run_project_is_routed() -> void:
+	# Godot's editor passes the configured main scene as a positional arg on F5. That is
+	# our own boot scene, not a scene the developer picked, so routing must still happen.
+	assert_false(
+		NetworkManager.supplies_its_own_scene(
+			_args(["godot", "--path", ".", "res://autoload/boot.tscn"]),
+			_args([]),
+			"res://autoload/boot.tscn"
+		),
+		"F5 in the editor must land on the join menu, not the bare Boot node"
+	)
+	assert_true(
+		NetworkManager.supplies_its_own_scene(
+			_args(["godot", "res://client/client_main.tscn"]),
+			_args([]),
+			"res://autoload/boot.tscn"
+		),
+		"a different scene on the line is still the developer picking it"
+	)
+
+
 func test_a_plain_launch_is_still_routed() -> void:
 	assert_false(
 		NetworkManager.supplies_its_own_scene(_args(["godot"]), _args([])),
