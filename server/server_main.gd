@@ -4,7 +4,9 @@ extends Node
 ## simulation. Every rule lives in `ArenaServer` and every packet in `NetworkManager`;
 ## there is deliberately nothing else here.
 
-var arena: ArenaServer
+## The match, authored as a child in `server_main.tscn` — an instance of
+## `server/arena_server.tscn`. The counterpart of `client_main.tscn`'s practice scene.
+@onready var arena: ArenaServer = $ArenaServer
 
 
 func _ready() -> void:
@@ -12,8 +14,6 @@ func _ready() -> void:
 	# CPU allows, burning a whole core to produce the same sixty physics steps.
 	Engine.max_fps = Engine.physics_ticks_per_second
 
-	arena = ArenaServer.new()
-	add_child(arena)
 	arena.roster_changed.connect(_on_roster_changed)
 
 	var port := NetworkManager.requested_port()
