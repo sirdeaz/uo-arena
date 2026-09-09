@@ -1,0 +1,13 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://server/arena_server.gd" id="1_arena_server"]
+[ext_resource type="Script" path="res://server/combat_resolver.gd" id="2_resolver"]
+[ext_resource type="PackedScene" path="res://arena/arena.tscn" id="3_arena"]
+
+[node name="ArenaServer" type="Node"]
+script = ExtResource("1_arena_server")
+
+[node name="Arena" parent="." instance=ExtResource("3_arena")]
+
+[node name="Resolver" type="Node" parent="."]
+script = ExtResource("2_resolver")

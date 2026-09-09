@@ -96,7 +96,15 @@ test needs it — see the carve-outs below.
   the tiles own the collision (a physics layer on the obstacles bit, `kind` custom-data
   for tent/rock/wall). Nothing describes the layout in code — `arena/arena_map.gd` reads
   it back: `obstacle_rects()` merges the solid cells, `cover_kind_at()` reads the tile.
-  Repaint the arena in the editor; the code adapts.
+  Repaint the arena in the editor; the code adapts. The server *instances* `arena.tscn`
+  too — as the `Arena` child of `server/arena_server.tscn`, never `load()`ed in
+  `_ready()`. `arena_server.tscn` (root `ArenaServer` + `Arena` + `Resolver`) and
+  `server_main.tscn` (composing an authored `ArenaServer`) are the server-side
+  counterparts of `arena_stage.tscn` / `client_main.tscn`: a fixed node assembled in
+  `_ready()` with `.new()` + `add_child()` is a bug — author it. The bare
+  `ArenaServer.new()` is not on the must-stay-constructible list (unlike
+  `Combatant` / `CombatResolver` / `PathFinder`); its three tests instance
+  `arena_server.tscn` and are the only guard against a silent slide back to `.new()`.
 - **Node Groups or TileSet custom-data name a role**, read by a helper — not an exported
   "type" enum on every instance.
 

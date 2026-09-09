@@ -8,7 +8,7 @@ var server: ArenaServer
 
 
 func before_each() -> void:
-	server = ArenaServer.new()
+	server = preload("res://server/arena_server.tscn").instantiate()
 	add_child(server)
 
 
