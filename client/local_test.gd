@@ -12,8 +12,8 @@ extends Node2D
 
 const DUMMY_THINK_SECONDS: float = 0.9
 
-## A scene rather than `Fighter.new()` so the character atlas comes wired from
-## `client/art/wizard.tres` and can be swapped in the editor.
+## A scene rather than `Fighter.new()` so the collision shape, the character's
+## `SpriteFrames` and the draw layers all come wired from `client/scenes/fighter.tscn`.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 
 ## The camera, the arena view, the sight-line layer, the bolt layer, the audio node and

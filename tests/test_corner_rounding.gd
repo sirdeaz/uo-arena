@@ -22,6 +22,10 @@ const STEP: float = Constants.PLAYER_MOVE_SPEED / 60.0
 ## arrives takes six, so anything still going at this point is going in circles.
 const PATIENCE_TICKS: int = 600
 
+## The authored fighter scene — its collision shape lives here now, not in `_ready`, so a
+## bare `Fighter.new()` would slide straight through every tent.
+const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
+
 var _map: ArenaMap
 var _finder: PathFinder
 var _fighter: Fighter
@@ -48,7 +52,7 @@ func before_each() -> void:
 		if grown.size() >= 3:
 			_no_go.append(grown)
 
-	_fighter = Fighter.new()
+	_fighter = FIGHTER_SCENE.instantiate()
 	add_child(_fighter)
 	_fighter.enable_pathfinding(_finder)
 	_fighter.pathfinding_enabled = true

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="FighterChrome" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://client/fighter_chrome.gd" id="1_chrome"]
+
+[resource]
+script = ExtResource("1_chrome")
+health_bar_width = 52.0
+health_bar_height = 6.0
+overhead_gap = 6.0
+mantra_gap = 14.0
+mantra_font_size = 16
+mantra_outline_size = 3
+paralyze_ring_offset = 7.0
+poison_ring_offset = 13.0
+footing_rim_width = 2.0
+head_top = -49.0
+chest = Vector2(0, -26)
