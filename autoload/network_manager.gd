@@ -52,7 +52,11 @@ func _process(delta: float) -> void:
 
 
 func _supplies_its_own_scene() -> bool:
-	return supplies_its_own_scene(OS.get_cmdline_args(), OS.get_cmdline_user_args())
+	return supplies_its_own_scene(
+		OS.get_cmdline_args(),
+		OS.get_cmdline_user_args(),
+		ProjectSettings.get_setting("application/run/main_scene", ""),
+	)
 
 
 ## True when the caller named the scene it wants to run — the test runner, the
@@ -60,14 +64,19 @@ func _supplies_its_own_scene() -> bool:
 ## silently swap out the scene they asked for, and the failure looks like the scene
 ## never loaded at all rather than like something replaced it.
 ##
+## A scene arg that is merely the configured main scene does not count: the editor's
+## Run Project passes `application/run/main_scene` as a positional argument, and
+## treating that as "the caller picked a scene" leaves plain F5 stranded on the bare
+## `Boot` node instead of routing to the join menu (#74).
+##
 ## Static and taking its arguments, so a test can exercise it without a command line.
 static func supplies_its_own_scene(
-	args: PackedStringArray, user_args: PackedStringArray
+	args: PackedStringArray, user_args: PackedStringArray, main_scene: String = ""
 ) -> bool:
 	if "--test" in args or "--test" in user_args:
 		return true
 	for arg in args:
-		if arg.ends_with(".tscn") or arg.ends_with(".scn"):
+		if (arg.ends_with(".tscn") or arg.ends_with(".scn")) and arg != main_scene:
 			return true
 	return false
 
