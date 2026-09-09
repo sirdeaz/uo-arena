@@ -12,7 +12,7 @@ var resolver: CombatResolver
 
 
 func before_each() -> void:
-	map = load("res://arena/arena.tscn").instantiate()
+	map = load("res://arena/arena_map.tscn").instantiate()
 	add_child(map)
 	resolver = CombatResolver.new()
 	add_child(resolver)

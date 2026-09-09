@@ -1,8 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://server/arena_server.gd" id="1_arena_server"]
-[ext_resource type="Script" path="res://server/combat_resolver.gd" id="2_resolver"]
-[ext_resource type="PackedScene" path="res://arena/arena.tscn" id="3_arena"]
+[ext_resource type="Script" uid="uid://rye16dadmkkt" path="res://server/arena_server.gd" id="1_arena_server"]
+[ext_resource type="Script" uid="uid://bpkbbyppv5ie0" path="res://server/combat_resolver.gd" id="2_resolver"]
+[ext_resource type="PackedScene" uid="uid://crg0hjmen880g" path="res://arena/arena_map.tscn" id="3_arena"]
 
 [node name="ArenaServer" type="Node"]
 script = ExtResource("1_arena_server")

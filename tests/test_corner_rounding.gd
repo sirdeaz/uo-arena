@@ -36,7 +36,7 @@ var _no_go: Array[PackedVector2Array] = []
 
 
 func before_each() -> void:
-	_map = load("res://arena/arena.tscn").instantiate()
+	_map = load("res://arena/arena_map.tscn").instantiate()
 	add_child(_map)
 	# The arena is collided by `TileMapLayer` tiles now, and their physics bodies are
 	# built on the first physics step — not synchronously on `add_child` the way the old

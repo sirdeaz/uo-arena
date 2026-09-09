@@ -2,7 +2,7 @@ extends Node2D
 class_name ArenaMap
 
 ## The arena, in one place — painted for looks and collided for physics by the same
-## `TileMapLayer`s, in `res://arena/arena.tscn`. The server loads this scene too; it
+## `TileMapLayer`s, in `res://arena/arena_map.tscn`. The server loads this scene too; it
 ## runs the tile physics headless and the Dedicated Server export drops the texture
 ## (checked in CI), so `server/` still ships collision only.
 ##

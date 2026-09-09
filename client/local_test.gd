@@ -22,7 +22,7 @@ const DUMMY_THINK_SECONDS: float = 0.9
 @onready var _bolts: BoltLayer = $Stage/Bolts
 @onready var _stage: ArenaStage = $Stage
 
-## Painted-and-collided arena, authored in `res://arena/arena.tscn`, instanced as a
+## Painted-and-collided arena, authored in `res://arena/arena_map.tscn`, instanced as a
 ## child of both this scene and the networked client's.
 @onready var map: ArenaMap = $Arena
 
@@ -40,7 +40,7 @@ func _ready() -> void:
 	($Stage/Camera2D as Camera2D).make_current()
 	_sight_line.draw.connect(_draw_sight_line)
 
-	# `arena.tscn`'s spawn markers stay the single source of truth for where the two
+	# `arena_map.tscn`'s spawn markers stay the single source of truth for where the two
 	# fighters start; `capture_promo_shot` overrides both positions anyway.
 	var spawns := map.get_spawn_positions()
 	player.position = spawns[0]

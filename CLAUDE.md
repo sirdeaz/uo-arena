@@ -92,11 +92,11 @@ test needs it — see the carve-outs below.
 - **One authored scene, shared by both clients.** The networked client and the practice
   harness instance the same `arena_stage.tscn` — never two parallel `_ready()` trees kept
   identical by memory. They drifted once already (`ArenaGround.position`, #43).
-- **One arena scene for client and server.** `res://arena/arena.tscn` is hand-painted;
+- **One arena scene for client and server.** `res://arena/arena_map.tscn` is hand-painted;
   the tiles own the collision (a physics layer on the obstacles bit, `kind` custom-data
   for tent/rock/wall). Nothing describes the layout in code — `arena/arena_map.gd` reads
   it back: `obstacle_rects()` merges the solid cells, `cover_kind_at()` reads the tile.
-  Repaint the arena in the editor; the code adapts. The server *instances* `arena.tscn`
+  Repaint the arena in the editor; the code adapts. The server *instances* `arena_map.tscn`
   too — as the `Arena` child of `server/arena_server.tscn`, never `load()`ed in
   `_ready()`. `arena_server.tscn` (root `ArenaServer` + `Arena` + `Resolver`) and
   `server_main.tscn` (composing an authored `ArenaServer`) are the server-side

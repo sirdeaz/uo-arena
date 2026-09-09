@@ -1,6 +1,6 @@
 extends TestCase
 
-## The arena is one authored scene now (`res://arena/arena.tscn`) — hand-painted in the
+## The arena is one authored scene now (`res://arena/arena_map.tscn`) — hand-painted in the
 ## editor, and read back by `ArenaMap`. Nothing describes the layout in code; these
 ## check the paint is internally consistent, because a slip in it is silent:
 ##
@@ -23,7 +23,7 @@ var floor_layer: TileMapLayer
 
 
 func before_each() -> void:
-	map = load("res://arena/arena.tscn").instantiate()
+	map = load("res://arena/arena_map.tscn").instantiate()
 	add_child(map)
 	walls = map.get_node("Walls")
 	cover = map.get_node("Cover")
