@@ -75,14 +75,16 @@ jobs:
         run: godot --headless res://tests/test_main.tscn -- --test
 
       - name: Export the dedicated server and check it stays lean
-        # `server/` is meant to export as collision only. Two things can break that:
-        #   - the character art (`wizard.*`) leaking in — it has no business on a server
-        #     and it is the biggest asset in the project;
-        #   - the PCK ballooning, which is what a real art bleed looks like.
-        # The arena's own tileset image (`Grass-01.png`, ~21 KB) rides along because the
-        # shared `arena.tscn` references it as a hard dependency and `exclude_filter`
-        # cannot drop a dependency — that is a rounding error, not a bleed. `--headless`
-        # would still run a bloated build, and preset 3 is built by nothing else in CI.
+        # `server/` is meant to export as collision only. Preset 3 now excludes the whole
+        # `client/*` tree, so nothing client-side — the fighter scene, the wizard atlas,
+        # the palette — should reach the server PCK. Two project-level dependencies ride
+        # along, and `exclude_filter` cannot drop a dependency:
+        #   - client/art/Grass-01.png (~21 KB) — the shared arena.tscn's tileset image;
+        #   - client/ui/ui_theme.tres (<1 KB: a SystemFont name list + size, no asset) —
+        #     named by project.godot's gui/theme/custom, so it is a global dependency.
+        # Both are rounding errors, not bleeds. Anything else under res://client/ is a real
+        # leak. The PCK size ceiling is the backstop for a bleed that keeps its path out of
+        # the strings table.
         run: |
           set -euo pipefail
           mkdir -p build/server
@@ -90,17 +92,18 @@ jobs:
             build/server/UOArenaServer.x86_64
           pck=$(ls build/server/*.pck | head -n1)
           bytes=$(wc -c < "$pck")
-          hits=$(strings "$pck" | grep -iP 'wizard\.(png|ctex)|client/art/(?!Grass-01)[^"]*\.(png|ctex|webp|jpe?g)' || true)
+          hits=$(strings "$pck" | grep -oP 'res://client/[\w./-]+' \
+            | grep -vP '^res://client/(art/Grass-01\.|ui/ui_theme\.tres)' | sort -u || true)
           if [ -n "$hits" ]; then
-            echo "::error::the dedicated-server PCK carries character or extra client art:"
-            echo "$hits" | sort -u
+            echo "::error::the dedicated-server PCK references client/ resources it should not:"
+            echo "$hits"
             exit 1
           fi
           if [ "$bytes" -gt 2097152 ]; then
             echo "::error::the dedicated-server PCK is ${bytes} bytes (> 2 MiB) — something heavy leaked in"
             exit 1
           fi
-          echo "server PCK is ${bytes} bytes, no character art"
+          echo "server PCK is ${bytes} bytes, no client resources beyond the arena tileset and UI theme"
 
       - name: Export web build
         run: |

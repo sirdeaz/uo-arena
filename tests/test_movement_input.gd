@@ -4,6 +4,10 @@ extends TestCase
 ## dead zone matters — without it, a cursor resting on your own feet produces a
 ## direction that flips every frame and the character vibrates in place.
 
+## The authored fighter scene. Instanced rather than `Fighter.new()` because the collision
+## shape lives in the scene now, and the steering tests need a body that can bump cover.
+const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
+
 
 func test_cursor_far_away_gives_a_unit_direction() -> void:
 	var direction := Fighter.movement_direction_toward(Vector2.ZERO, Vector2(300, 0))
@@ -99,7 +103,7 @@ func before_each() -> void:
 	var finder := PathFinder.new()
 	finder.build(_map)
 
-	_fighter = Fighter.new()
+	_fighter = FIGHTER_SCENE.instantiate()
 	add_child(_fighter)
 	_fighter.enable_pathfinding(finder)
 	# North of the tents, with the far side of both of them as the destination.
@@ -169,7 +173,7 @@ func test_the_dead_zone_still_wins_with_the_assist_on() -> void:
 func test_a_fighter_with_no_route_finder_just_walks_straight() -> void:
 	# Every remote body is in this state, and so is every test that never asked for the
 	# assist. It must cost them nothing.
-	var plain := Fighter.new()
+	var plain: Fighter = FIGHTER_SCENE.instantiate()
 	add_child(plain)
 	plain.global_position = Vector2(0.0, -300.0)
 	plain.pathfinding_enabled = true

@@ -14,17 +14,12 @@ class_name Fighter
 ##                      to wherever the last snapshot put it.
 
 const RADIUS: float = Constants.PLAYER_RADIUS
-const HEALTH_BAR_WIDTH: float = 52.0
 
 ## Top of the character's head, in body coordinates. Everything overhead hangs off
 ## this rather than off `RADIUS`: the sprite is taller than the collision circle, so a
 ## bar placed above the circle would be drawn across the mage's chest. Read off `sprite`
 ## in `_ready` rather than a `const`, now that the atlas geometry lives in a resource.
 var _head_top: float = 0.0
-
-## Gap between the head and the health bar, and between the bar and the mantra above it.
-const OVERHEAD_GAP: float = 6.0
-const MANTRA_GAP: float = 14.0
 
 ## Cursor distance below which holding the move button does nothing. Without it a
 ## cursor resting on your own feet flips direction every frame and you vibrate.
@@ -39,14 +34,13 @@ const MOUSE_DEAD_ZONE: float = 16.0
 ## corner is mid-walk, not a request to stand still.
 const WAYPOINT_EPSILON: float = 0.01
 
+## The colour the mantra is set in. Every colour still goes through `client/palette.gd`;
+## the point size it is set at lives on `FighterChrome`.
 const MANTRA_COLOR := Palette.MANTRA
-const MANTRA_FONT_SIZE: int = 16
 
-## Thickness of the dark halo behind the mantra. The words are read against the arena
-## floor at a glance, mid-fight, so they get an outline rather than relying on contrast.
-const MANTRA_OUTLINE_SIZE: int = 3
-
-## How long the release / fizzle / interrupt burst stays on screen.
+## How long the release / fizzle / interrupt burst stays on screen. Feel, not chrome, so
+## it stays a `const` — like the prediction thresholds below and unlike the overhead
+## measurements, which moved to `client/art/fighter_chrome.tres`.
 const BURST_SECONDS: float = 0.4
 const RUNE_COUNT: int = 3
 
@@ -74,6 +68,13 @@ const REMOTE_RATE: float = 18.0
 ## gets the default, which `_ready` loads when this is null.
 @export var sprite: FighterSprite
 
+## The overhead-chrome measurements — health bar, status-ring offsets, mantra sizing,
+## footing rim. A resource for the same reason `sprite` is: tuned in the inspector next
+## to the sprite, not as constants here. `fighter.tscn` names
+## `client/art/fighter_chrome.tres`; `_ready` loads that default when a bare
+## `Fighter.new()` leaves this null.
+@export var chrome: FighterChrome
+
 ## True when this body is a view of a combatant the server owns. It then advances no
 ## timers of its own — health, status and cast state are written from snapshots — and
 ## only the display timers move locally, so the cast bar doesn't step at snapshot rate.
@@ -93,13 +94,24 @@ var _steering: PathSteering = null
 
 var combatant: Combatant
 
-var _fx: Node2D
+## The character on screen. A `Sprite2D` child rather than a `draw_texture_rect_region`
+## call, so it can be selected and previewed in the editor; `_sync_character` walks its
+## `region_rect` across the atlas each frame. Null only for a bare `Fighter.new()` with
+## no scene, which still runs its logic and draws its footing.
+@onready var _character: Sprite2D = get_node_or_null(^"Character")
 
-## Everything a player *reads* — status rings, health, the mantra — drawn on its own
-## layer above the character. A child rather than part of `_draw` because the sprite
-## has to go underneath all of it, and because this layer wants the engine's default
-## filtering for text while the sprite wants none at all.
-var _ui: Node2D
+## Spell energy, on its own additive layer so glow accumulates toward white instead of
+## flatly tinting the character. Authored lifted to the chest — the aura and the burst
+## are things happening to a body, so they follow it up off the floor — and kept at z 0,
+## not below: a negative z_index would sort it under the arena floor, which then paints
+## over it.
+@onready var _fx: Node2D = get_node_or_null(^"FX")
+
+## Everything a player *reads* — status rings, health, the mantra — on its own layer
+## above the character. Separate from `_draw` because the sprite goes underneath all of
+## it, and because this layer keeps linear filtering for the downscaled Uncial mantra
+## while the sprite wants nearest.
+@onready var _ui: Node2D = get_node_or_null(^"UI")
 
 var _anim_time: float = 0.0
 
@@ -127,51 +139,30 @@ var _burst_expands: bool = true
 
 
 func _ready() -> void:
-	# A bare `Fighter.new()` — the movement and corner-rounding tests still make one —
-	# comes in with no sprite. The scene wires the real resource; this is the fallback.
+	# A bare `Fighter.new()` — the sceneless-fallback test still makes one — comes in with
+	# no sprite and no chrome. The scene wires the real resources; these are the fallbacks.
 	if sprite == null:
 		sprite = load("res://client/art/wizard.tres")
+	if chrome == null:
+		chrome = load("res://client/art/fighter_chrome.tres")
 	_head_top = sprite.head_top()
 
 	combatant = Combatant.new()
 	add_child(combatant)
-
-	collision_layer = Constants.LAYER_PLAYERS
-	collision_mask = Constants.LAYER_OBSTACLES
-
-	var collision := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = RADIUS
-	collision.shape = circle
-	add_child(collision)
-
 	combatant.position = global_position
 
-	# Spell energy draws on its own additive layer so glow accumulates toward white
-	# instead of flatly tinting the character. Kept at z 0, not below: a negative
-	# z_index would sort it under the arena floor, which then paints over it.
-	_fx = Node2D.new()
-	# Lifted to the character's chest. The aura and the burst are things happening to a
-	# body, so they follow the body up off the floor — unlike the sight line and the
-	# bolts, which stay at the feet because that is where the raycast actually is, and
-	# a drawn line that is not the line being tested is the failure `ArenaView` exists
-	# to avoid.
-	_fx.position = sprite.chest
-	_fx.z_index = 0
-	_fx.material = SpellFX.additive_material()
-	add_child(_fx)
-	_fx.draw.connect(_draw_fx)
+	# The scene authors the atlas texture on the `Character` node, but a swapped
+	# `FighterSprite` can point at a different sheet — keep the node in step with it.
+	if _character != null:
+		_character.texture = sprite.texture
 
-	# Added last so it draws last. Health, status and the mantra are the reads that
-	# decide fights, and a cast aura is now big enough and high enough to sit right
-	# behind them — so they go over the glow, not under it.
-	_ui = Node2D.new()
-	# The project draws everything nearest-neighbour now (pixel-art tiles and the mage),
-	# but the overhead text wants the smoothing back — a downscaled Uncial glyph under
-	# nearest sampling crawls. This is the one node that opts out.
-	_ui.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	add_child(_ui)
-	_ui.draw.connect(_draw_ui)
+	# The collision shape, the two draw layers and their properties are all authored in
+	# `client/scenes/fighter.tscn` now; a sceneless `Fighter.new()` simply has none, and
+	# the guards below let it run without them.
+	if _fx != null:
+		_fx.draw.connect(_draw_fx)
+	if _ui != null:
+		_ui.draw.connect(_draw_ui)
 
 	var state := combatant.entity_state
 	state.cast_completed.connect(
@@ -223,8 +214,10 @@ func _physics_process(delta: float) -> void:
 	_update_facing(global_position - was_at)
 
 	queue_redraw()
-	_ui.queue_redraw()
-	_fx.queue_redraw()
+	if _ui != null:
+		_ui.queue_redraw()
+	if _fx != null:
+		_fx.queue_redraw()
 
 
 ## Pulls this body toward the server's version of where it is. Exponential rather than a
@@ -347,12 +340,23 @@ func input_direction() -> Vector2:
 
 
 func _draw() -> void:
+	_sync_character()
 	_draw_footing()
-	draw_texture_rect_region(
-		sprite.texture,
-		sprite.rect_for(Vector2.ZERO, _facing),
-		current_frame_region()
-	)
+
+
+## Points the `Character` node at this frame's atlas cell. The frame maths still lives in
+## `FighterSprite` and `current_frame_region`; this only copies the answer onto a node the
+## editor can show, in place of the `draw_texture_rect_region` call it replaced —
+## `centered = false` plus this `offset` reproduces the old `rect_for` top-left exactly.
+##
+## Driven from `_draw` rather than `_physics_process` so the sprite tracks the posture on
+## every redraw, including the ones a frozen pose asks for (the promo capture) where
+## physics is not running.
+func _sync_character() -> void:
+	if _character == null:
+		return
+	_character.region_rect = current_frame_region()
+	_character.offset = -sprite.anchor(_facing)
 
 
 ## The mark on the floor the character stands on: the collision circle itself, filled
@@ -367,7 +371,7 @@ func _draw_footing() -> void:
 	draw_circle(Vector2.ZERO, RADIUS, Color(Palette.OUTLINE, Palette.BODY_SHADOW_ALPHA))
 	draw_arc(
 		Vector2.ZERO, RADIUS, 0.0, TAU, 32,
-		Color(body_color, Palette.BODY_RING_ALPHA), 2.0, true
+		Color(body_color, Palette.BODY_RING_ALPHA), chrome.footing_rim_width, true
 	)
 
 
@@ -411,11 +415,13 @@ func _update_facing(travelled: Vector2) -> void:
 func _draw_ui() -> void:
 	if combatant.is_paralyzed():
 		_ui.draw_arc(
-			Vector2.ZERO, RADIUS + 7.0, 0.0, TAU, 32, Palette.STATUS_PARALYZED, 3.0, true
+			Vector2.ZERO, RADIUS + chrome.paralyze_ring_offset, 0.0, TAU, 32,
+			Palette.STATUS_PARALYZED, 3.0, true
 		)
 	if combatant.poison_seconds_remaining > 0.0:
 		_ui.draw_arc(
-			Vector2.ZERO, RADIUS + 13.0, 0.0, TAU, 32, Palette.STATUS_POISONED, 2.0, true
+			Vector2.ZERO, RADIUS + chrome.poison_ring_offset, 0.0, TAU, 32,
+			Palette.STATUS_POISONED, 2.0, true
 		)
 
 	_draw_health_bar()
@@ -499,29 +505,32 @@ func _draw_mantra() -> void:
 
 	var font := SpellVisuals.MANTRA_FONT
 	var text: String = state.current_spell.mantra
-	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE).x
-	var origin := Vector2(-width * 0.5, _head_top - OVERHEAD_GAP - MANTRA_GAP)
+	var font_size := chrome.mantra_font_size
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var origin := Vector2(-width * 0.5, _head_top - chrome.overhead_gap - chrome.mantra_gap)
 
 	# Dark outline so the words stay readable over the arena floor. One call rather than
 	# the four offset passes this used to take.
 	_ui.draw_string_outline(
-		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE,
-		MANTRA_OUTLINE_SIZE, Palette.OUTLINE
+		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
+		chrome.mantra_outline_size, Palette.OUTLINE
 	)
 	_ui.draw_string(
-		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, MANTRA_FONT_SIZE, MANTRA_COLOR
+		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, MANTRA_COLOR
 	)
 
 
 func _draw_health_bar() -> void:
 	var fraction := clampf(combatant.health / Constants.PLAYER_MAX_HEALTH, 0.0, 1.0)
-	var origin := Vector2(-HEALTH_BAR_WIDTH * 0.5, _head_top - OVERHEAD_GAP)
-	_ui.draw_rect(Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.BAR_TRACK)
+	var bar_width := chrome.health_bar_width
+	var bar_height := chrome.health_bar_height
+	var origin := Vector2(-bar_width * 0.5, _head_top - chrome.overhead_gap)
+	_ui.draw_rect(Rect2(origin, Vector2(bar_width, bar_height)), Palette.BAR_TRACK)
 	_ui.draw_rect(
-		Rect2(origin, Vector2(HEALTH_BAR_WIDTH * fraction, 6.0)),
+		Rect2(origin, Vector2(bar_width * fraction, bar_height)),
 		Palette.HEALTH_HURT if fraction < Palette.HEALTH_HURT_FRACTION \
 			else Palette.HEALTH_HEALTHY
 	)
 	_ui.draw_rect(
-		Rect2(origin, Vector2(HEALTH_BAR_WIDTH, 6.0)), Palette.OUTLINE, false, 1.0
+		Rect2(origin, Vector2(bar_width, bar_height)), Palette.OUTLINE, false, 1.0
 	)

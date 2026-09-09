@@ -95,21 +95,23 @@ if [ "$want_linux" -eq 1 ]; then
     echo "Linux: build/UOArena-linux-x86_64.tar.gz ($(human_size build/UOArena-linux-x86_64.tar.gz))"
 fi
 
-# The dedicated-server build is meant to carry collision, not art. What must never
-# appear is the character art (`wizard.*`) or a ballooning PCK — a real bleed. The
-# arena's own tileset image (`Grass-01.png`, ~21 KB) rides along because the shared
-# `arena.tscn` references it as a hard dependency and `exclude_filter` cannot drop one;
-# that is a rounding error, not a bleed.
+# The dedicated-server build is meant to carry collision, not art. Preset 3 excludes the
+# whole `client/*` tree, so nothing client-side should reach the PCK. Two project-level
+# dependencies ride along and `exclude_filter` cannot drop one: `client/art/Grass-01.png`
+# (~21 KB, the shared arena tileset image) and `client/ui/ui_theme.tres` (<1 KB, a
+# SystemFont name list named by project.godot's gui/theme/custom). Both are rounding
+# errors; anything else under `res://client/`, or a ballooning PCK, is a real leak.
 assert_server_pck_stays_lean() {
     pck=$(ls build/server/*.pck 2>/dev/null | head -n1)
     if [ -z "$pck" ]; then
         echo "  error: no server PCK to check" >&2
         exit 1
     fi
-    hits=$(strings "$pck" | grep -iP 'wizard\.(png|ctex)|client/art/(?!Grass-01)[^"]*\.(png|ctex|webp|jpe?g)' || true)
+    hits=$(strings "$pck" | grep -oP 'res://client/[\w./-]+' \
+        | grep -vP '^res://client/(art/Grass-01\.|ui/ui_theme\.tres)' | sort -u || true)
     if [ -n "$hits" ]; then
-        echo "  error: the dedicated-server PCK carries character or extra client art:" >&2
-        echo "$hits" | sort -u >&2
+        echo "  error: the dedicated-server PCK references client/ resources it should not:" >&2
+        echo "$hits" >&2
         exit 1
     fi
     bytes=$(wc -c < "$pck")
@@ -117,7 +119,7 @@ assert_server_pck_stays_lean() {
         echo "  error: the dedicated-server PCK is ${bytes} bytes (> 2 MiB)" >&2
         exit 1
     fi
-    echo "Server PCK: $(human_size "$pck"), no character art"
+    echo "Server PCK: $(human_size "$pck"), no client resources beyond the arena tileset image"
 }
 
 if [ "$want_server" -eq 1 ]; then

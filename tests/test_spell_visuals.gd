@@ -9,6 +9,10 @@ const SPELL_NAMES := [
 	"magic_arrow", "poison", "lightning", "flamestrike", "paralyze", "cure",
 ]
 
+## The point size the mantra is drawn at now lives on `FighterChrome`, so measure
+## against the authored value the fighter actually uses.
+const CHROME := preload("res://client/art/fighter_chrome.tres")
+
 
 func _spell(spell_name: String) -> SpellData:
 	return load("res://common/spells/%s.tres" % spell_name)
@@ -81,7 +85,7 @@ func test_mantras_are_measurable_so_they_can_be_centred_overhead() -> void:
 	for spell_name in SPELL_NAMES:
 		var mantra: String = _spell(spell_name).mantra
 		var width := SpellVisuals.MANTRA_FONT.get_string_size(
-			mantra, HORIZONTAL_ALIGNMENT_LEFT, -1, Fighter.MANTRA_FONT_SIZE
+			mantra, HORIZONTAL_ALIGNMENT_LEFT, -1, CHROME.mantra_font_size
 		).x
 		assert_true(width > 0.0, "%s should have a measurable width" % mantra)
 		assert_true(
