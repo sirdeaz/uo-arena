@@ -1,14 +1,14 @@
 extends TestCase
 
 ## `client/scenes/fighter.tscn` is authored now, not built in `Fighter._ready()`. These
-## pin the authored numbers to the code-side source of truth — `common/constants.gd` for
-## the body, `client/art/wizard.tres` for where the sprite sits, `SpellFX` for the aura
-## material, the `FighterChrome` script for the overhead measurements — so a change to one
-## the scene did not follow fails here rather than as a fighter who hops, vanishes, or
-## stops colliding. It is the client-side twin of `tests/test_player_body.gd`.
+## pin the authored nodes to the code-side source of truth — `common/constants.gd` for
+## the body, `client/art/wizard_frames.tres` for the character's animations, `SpellFX`
+## for the aura material, the `FighterChrome` script for the overhead measurements — so a
+## change to one the scene did not follow fails here rather than as a fighter who hops,
+## vanishes, or stops colliding. It is the client-side twin of `tests/test_player_body.gd`.
 
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
-const SPRITE := preload("res://client/art/wizard.tres")
+const FRAMES := preload("res://client/art/wizard_frames.tres")
 const CHROME := preload("res://client/art/fighter_chrome.tres")
 
 var fighter: Fighter
@@ -48,33 +48,32 @@ func test_its_circle_is_exactly_the_shared_player_radius() -> void:
 	)
 
 
-func test_the_character_node_stands_frame_zero_where_the_atlas_says() -> void:
-	var character := fighter.get_node("Character") as Sprite2D
-	assert_true(character != null, "the mage must be a Sprite2D the editor can select")
+func test_the_character_is_an_animated_sprite_playing_the_authored_pack() -> void:
+	var character := fighter.get_node("Character") as AnimatedSprite2D
+	assert_true(character != null, "the mage must be an AnimatedSprite2D the editor can drive")
+	assert_eq(
+		character.sprite_frames,
+		FRAMES,
+		"the Character node must play the authored wizard_frames.tres, not a copy"
+	)
 	assert_false(
 		character.centered,
 		"a centred 79x65 cell lands the feet on a half-pixel and blurs the pixel art"
 	)
-	assert_true(character.region_enabled, "the Sprite2D shows one cell out of the strip")
-	assert_eq(
-		character.region_rect,
-		SPRITE.region_for(0),
-		"the authored cell has drifted from wizard.tres frame 0"
-	)
 	assert_eq(
 		character.offset,
-		-SPRITE.anchor(FighterSprite.Facing.DOWN),
-		"the authored offset must stand frame 0's feet on the body origin"
+		Vector2(-31.0, -49.0),
+		"the authored offset must stand the pack's registered feet on the body origin"
+	)
+	assert_eq(
+		character.animation,
+		&"idle_down",
+		"a fighter that has not moved yet faces the camera, standing"
 	)
 	assert_eq(
 		character.texture_filter,
 		CanvasItem.TEXTURE_FILTER_PARENT_NODE,
 		"the mage samples nearest like the rest of the game — it must not override the filter"
-	)
-	assert_eq(
-		character.texture,
-		SPRITE.texture,
-		"the authored atlas should be the texture wizard.tres itself points at"
 	)
 
 
@@ -83,8 +82,8 @@ func test_the_fx_layer_sits_at_the_chest_with_the_additive_material() -> void:
 	assert_true(fx != null, "the aura needs its own layer above the character")
 	assert_eq(
 		fx.position,
-		SPRITE.chest,
-		"the FX layer has drifted from wizard.tres chest — the aura will pool at the ankles"
+		CHROME.chest,
+		"the FX layer has drifted from fighter_chrome.tres chest — the aura will pool at the ankles"
 	)
 	var material := fx.material as CanvasItemMaterial
 	assert_true(material != null, "without a material the additive glow just tints the robe")
@@ -136,15 +135,21 @@ func test_the_authored_chrome_matches_the_script_defaults() -> void:
 		defaults.footing_rim_width,
 		"fighter_chrome.tres footing_rim_width has drifted from the FighterChrome default"
 	)
+	assert_almost_eq(
+		CHROME.head_top,
+		defaults.head_top,
+		"fighter_chrome.tres head_top has drifted from the FighterChrome default"
+	)
+	assert_eq(
+		CHROME.chest,
+		defaults.chest,
+		"fighter_chrome.tres chest has drifted from the FighterChrome default"
+	)
 
 
 func test_a_sceneless_fighter_still_stands_up() -> void:
 	var bare := Fighter.new()
 	add_child(bare)
-	assert_true(
-		bare.sprite != null,
-		"a bare Fighter.new() must still load the default atlas"
-	)
 	assert_true(
 		bare.chrome != null,
 		"a bare Fighter.new() must still load the default chrome"

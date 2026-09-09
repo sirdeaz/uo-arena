@@ -48,3 +48,14 @@ class_name FighterChrome
 @export_group("Footing")
 ## Line thickness of the identity ring around the fighter's feet.
 @export var footing_rim_width: float = 2.0
+
+@export_group("Sprite anchors")
+## Top of the character's head in body coordinates (negative y is up). The overhead reads
+## hang off this rather than off the collision radius — the sprite is taller than the
+## circle, so a bar placed above the circle would cross the mage's chest. Measured off
+## `client/art/wizard.png`; see `client/art/README.md`.
+@export var head_top: float = -49.0
+## Roughly the character's middle, measured up from the feet. Body effects — the cast
+## aura, the release burst — gather here rather than at the ankles, where they would read
+## as a puddle. The `FX` layer in `fighter.tscn` is authored to this same point.
+@export var chest: Vector2 = Vector2(0.0, -26.0)

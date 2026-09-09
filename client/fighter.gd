@@ -15,12 +15,6 @@ class_name Fighter
 
 const RADIUS: float = Constants.PLAYER_RADIUS
 
-## Top of the character's head, in body coordinates. Everything overhead hangs off
-## this rather than off `RADIUS`: the sprite is taller than the collision circle, so a
-## bar placed above the circle would be drawn across the mage's chest. Read off `sprite`
-## in `_ready` rather than a `const`, now that the atlas geometry lives in a resource.
-var _head_top: float = 0.0
-
 ## Cursor distance below which holding the move button does nothing. Without it a
 ## cursor resting on your own feet flips direction every frame and you vibrate.
 ##
@@ -62,17 +56,15 @@ const REMOTE_RATE: float = 18.0
 @export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
 
-## The character atlas and its frame table. A resource so the art is swapped in the
-## editor rather than in code — `client/scenes/fighter.tscn` names `client/art/wizard.tres`
-## here. Left assignable rather than hard-wired so a bare `Fighter.new()` in a test still
-## gets the default, which `_ready` loads when this is null.
-@export var sprite: FighterSprite
-
 ## The overhead-chrome measurements — health bar, status-ring offsets, mantra sizing,
-## footing rim. A resource for the same reason `sprite` is: tuned in the inspector next
-## to the sprite, not as constants here. `fighter.tscn` names
+## footing rim, and the two sprite anchors the reads hang off. A resource so the art is
+## tuned in the inspector, not as constants here. `fighter.tscn` names
 ## `client/art/fighter_chrome.tres`; `_ready` loads that default when a bare
 ## `Fighter.new()` leaves this null.
+##
+## The character's own animation set lives in `client/art/wizard_frames.tres`, a
+## `SpriteFrames` assigned to the `Character` `AnimatedSprite2D` in the scene —
+## `_update_character_animation` only names an animation and calls `play()` on it.
 @export var chrome: FighterChrome
 
 ## True when this body is a view of a combatant the server owns. It then advances no
@@ -94,11 +86,11 @@ var _steering: PathSteering = null
 
 var combatant: Combatant
 
-## The character on screen. A `Sprite2D` child rather than a `draw_texture_rect_region`
-## call, so it can be selected and previewed in the editor; `_sync_character` walks its
-## `region_rect` across the atlas each frame. Null only for a bare `Fighter.new()` with
-## no scene, which still runs its logic and draws its footing.
-@onready var _character: Sprite2D = get_node_or_null(^"Character")
+## The character on screen: an `AnimatedSprite2D` whose `SpriteFrames` and per-set timing
+## are authored in `client/art/wizard_frames.tres`. `_update_character_animation` picks an
+## animation name and plays it; nothing here sets a frame up. Null only for a bare
+## `Fighter.new()` with no scene, which still runs its logic and draws its footing.
+@onready var _character: AnimatedSprite2D = get_node_or_null(^"Character")
 
 ## Spell energy, on its own additive layer so glow accumulates toward white instead of
 ## flatly tinting the character. Authored lifted to the chest — the aura and the burst
@@ -140,25 +132,17 @@ var _burst_expands: bool = true
 
 func _ready() -> void:
 	# A bare `Fighter.new()` — the sceneless-fallback test still makes one — comes in with
-	# no sprite and no chrome. The scene wires the real resources; these are the fallbacks.
-	if sprite == null:
-		sprite = load("res://client/art/wizard.tres")
+	# no chrome. The scene wires the real resource; this is the fallback.
 	if chrome == null:
 		chrome = load("res://client/art/fighter_chrome.tres")
-	_head_top = sprite.head_top()
 
 	combatant = Combatant.new()
 	add_child(combatant)
 	combatant.position = global_position
 
-	# The scene authors the atlas texture on the `Character` node, but a swapped
-	# `FighterSprite` can point at a different sheet — keep the node in step with it.
-	if _character != null:
-		_character.texture = sprite.texture
-
-	# The collision shape, the two draw layers and their properties are all authored in
-	# `client/scenes/fighter.tscn` now; a sceneless `Fighter.new()` simply has none, and
-	# the guards below let it run without them.
+	# The collision shape, the character's SpriteFrames, the two draw layers and their
+	# properties are all authored in `client/scenes/fighter.tscn` now; a sceneless
+	# `Fighter.new()` simply has none, and the guards below let it run without them.
 	if _fx != null:
 		_fx.draw.connect(_draw_fx)
 	if _ui != null:
@@ -212,6 +196,7 @@ func _physics_process(delta: float) -> void:
 	if delta > 0.0:
 		_travel_speed = was_at.distance_to(global_position) / delta
 	_update_facing(global_position - was_at)
+	_update_character_animation()
 
 	queue_redraw()
 	if _ui != null:
@@ -340,23 +325,43 @@ func input_direction() -> Vector2:
 
 
 func _draw() -> void:
-	_sync_character()
 	_draw_footing()
 
 
-## Points the `Character` node at this frame's atlas cell. The frame maths still lives in
-## `FighterSprite` and `current_frame_region`; this only copies the answer onto a node the
-## editor can show, in place of the `draw_texture_rect_region` call it replaced —
-## `centered = false` plus this `offset` reproduces the old `rect_for` top-left exactly.
+## Plays the animation for this frame's heading and posture on the `Character`
+## `AnimatedSprite2D`. The frames, their speed and their loop flag live in
+## `client/art/wizard_frames.tres`; this only names one and calls `play()` when the
+## posture or heading changes.
 ##
-## Driven from `_draw` rather than `_physics_process` so the sprite tracks the posture on
-## every redraw, including the ones a frozen pose asks for (the promo capture) where
-## physics is not running.
-func _sync_character() -> void:
-	if _character == null:
+## A cast is the exception: rather than run on the animation's own clock, its frame is
+## scrubbed to real cast progress, so a one-second spell and a four-second one show a
+## different pose at the same moment — the read on how close the spell is to landing,
+## the same choice `_draw_cast_animation` makes for the aura.
+func _update_character_animation() -> void:
+	if _character == null or _character.sprite_frames == null:
 		return
-	_character.region_rect = current_frame_region()
-	_character.offset = -sprite.anchor(_facing)
+
+	var state := combatant.entity_state
+	var posture := FighterSprite.animation_for(state.current_state, _travel_speed)
+	var wanted := FighterSprite.animation_name(posture, _facing)
+
+	var count := _character.sprite_frames.get_frame_count(wanted)
+	if count <= 0:
+		return
+
+	if posture == FighterSprite.Anim.CAST and state.current_spell != null \
+			and state.current_spell.cast_time_seconds > 0.0:
+		if _character.animation != wanted:
+			_character.play(wanted)
+		var progress := clampf(
+			state.cast_time_elapsed / state.current_spell.cast_time_seconds, 0.0, 1.0
+		)
+		_character.pause()
+		_character.frame = clampi(int(progress * float(count)), 0, count - 1)
+		return
+
+	if _character.animation != wanted or not _character.is_playing():
+		_character.play(wanted)
 
 
 ## The mark on the floor the character stands on: the collision circle itself, filled
@@ -372,19 +377,6 @@ func _draw_footing() -> void:
 	draw_arc(
 		Vector2.ZERO, RADIUS, 0.0, TAU, 32,
 		Color(body_color, Palette.BODY_RING_ALPHA), chrome.footing_rim_width, true
-	)
-
-
-## Which patch of the atlas this fighter is showing right now. Public so the practice
-## harness and the tests can ask without waiting for a frame to be drawn.
-func current_frame_region() -> Rect2:
-	var state := combatant.entity_state
-	var anim := FighterSprite.animation_for(state.current_state, _travel_speed)
-	var progress := 0.0
-	if anim == FighterSprite.Anim.CAST and state.current_spell != null:
-		progress = state.cast_time_elapsed / state.current_spell.cast_time_seconds
-	return sprite.region_for(
-		sprite.frame_for(anim, _facing, _anim_time, progress)
 	)
 
 
@@ -507,7 +499,7 @@ func _draw_mantra() -> void:
 	var text: String = state.current_spell.mantra
 	var font_size := chrome.mantra_font_size
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	var origin := Vector2(-width * 0.5, _head_top - chrome.overhead_gap - chrome.mantra_gap)
+	var origin := Vector2(-width * 0.5, chrome.head_top - chrome.overhead_gap - chrome.mantra_gap)
 
 	# Dark outline so the words stay readable over the arena floor. One call rather than
 	# the four offset passes this used to take.
@@ -524,7 +516,7 @@ func _draw_health_bar() -> void:
 	var fraction := clampf(combatant.health / Constants.PLAYER_MAX_HEALTH, 0.0, 1.0)
 	var bar_width := chrome.health_bar_width
 	var bar_height := chrome.health_bar_height
-	var origin := Vector2(-bar_width * 0.5, _head_top - chrome.overhead_gap)
+	var origin := Vector2(-bar_width * 0.5, chrome.head_top - chrome.overhead_gap)
 	_ui.draw_rect(Rect2(origin, Vector2(bar_width, bar_height)), Palette.BAR_TRACK)
 	_ui.draw_rect(
 		Rect2(origin, Vector2(bar_width * fraction, bar_height)),

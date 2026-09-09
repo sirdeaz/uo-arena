@@ -78,6 +78,9 @@ func _hold_cast(fighter: Fighter, spell_name: String, progress: float) -> void:
 	# Stop the timers so the pose survives the frames spent waiting for the draw.
 	state.set_process(false)
 	fighter.set_physics_process(false)
+	# Physics is what normally drives the sprite; call it once by hand so the mage holds
+	# the cast frame for this progress instead of whatever it was last playing.
+	fighter._update_character_animation()
 
 
 ## Crop the rendered frame to the preview's aspect ratio and scale it to size. Cropping

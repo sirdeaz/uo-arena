@@ -13,3 +13,5 @@ mantra_outline_size = 3
 paralyze_ring_offset = 7.0
 poison_ring_offset = 13.0
 footing_rim_width = 2.0
+head_top = -49.0
+chest = Vector2(0, -26)

@@ -32,19 +32,21 @@ two honest.
 
 ## wizard.png
 
-The fighters. One strip of 46 frames, 79×65 each — 3634×65 in total. `wizard.tres`
-(a `FighterSprite` resource — see `client/fighter_sprite.gd`) points at this PNG and
-carries the frame table; `client/scenes/fighter.tscn` assigns that resource to every
-fighter, so the sheet is swapped in the inspector, not in code. It draws **four
-headings**: a six-frame walk and a four-frame cast for each of down, up, right and left,
-plus a six-frame channel set the game does not use.
+The fighters. One strip of 46 frames, 79×65 each — 3634×65 in total. `wizard_frames.tres`
+(a `SpriteFrames` resource) slices it into twelve animations — a six-frame walk and a
+four-frame cast for each of down, up, right and left, plus four idle sets that replay the
+walk frames slowly — and `client/scenes/fighter.tscn` assigns it to the `Character`
+`AnimatedSprite2D` on every fighter. Nothing in code sets a frame up: `Fighter` names an
+animation (`FighterSprite.animation_name`) and calls `play()` on it as the fighter moves
+or casts. The six-frame channel set (frames 40–45) is left out of the resource entirely.
+Swapping the pack is editing that `.tres` in the SpriteFrames editor.
 
 It carries **posture and heading, and nothing else** — which way you are pointing, whether
 you are walking, whether a spell is coming. Health, status, whose body this is and which
 spell it is stay `_draw()` calls in palette colours, because every fighter in the arena
 wears this same robe and one robe cannot be told from another at a glance.
-`docs/art-direction.md` states that rule and `tests/test_fighter_sprite.gd` is where it is
-checked.
+`docs/art-direction.md` states that rule; `tests/test_fighter_sprite.gd` checks the
+heading/posture decision and `tests/test_fighter_frames.gd` re-measures the pack.
 
 - **Source:** a wizard character pack supplied for #26, as a single pre-packed strip.
 - **Licence:** ⚠️ **not yet settled.** The repository is MIT and `client/fonts/OFL.txt` is
@@ -59,23 +61,29 @@ checked.
 ### Shipped exactly as supplied
 
 There is **no packing step**. The pack arrives as a registered atlas on a uniform 79×65
-grid, so what ships is the artwork that was handed over, byte for byte, and there is no
-script standing between the two that could quietly change it. The frame table in
-`wizard.tres` was read off the sheet rather than derived — walk and cast alternate by
-heading instead of sitting in blocks, so it is a table and not a stride.
+grid, so what ships is the artwork that was handed over, byte for byte. Each frame in
+`wizard_frames.tres` is an `AtlasTexture` over a single cell — walk and cast alternate by
+heading on the sheet rather than sitting in blocks, so the twelve animations pick out
+non-contiguous runs.
 
 ### Two things measured rather than assumed
 
 - **The left-facing walk sits about 3.6 px left in its cells.** Everything else registers
-  within a pixel. Drawn from one anchor a fighter would hop sideways every time it turned,
-  so the `anchor_*` fields in `wizard.tres` are per heading, and
-  `test_every_heading_stands_where_its_anchor_says` re-measures the committed PNG rather
-  than trusting them.
+  within a pixel. Drawn from one `AnimatedSprite2D.offset` a fighter would hop sideways
+  every time it turned left, so the left frames' `AtlasTexture`s carry a `margin` that
+  pulls them back into registration. `test_every_heading_stands_in_the_same_place`
+  re-measures the committed PNG rather than trusting it.
 - **Frames 40–45 are a staff-raised channel** with its own yellow-and-blue sparkle burst,
   and are deliberately unused. The game already announces a cast with the mantra overhead
   and an aura in the colour of the spell being cast; this would say the same thing again,
-  in the wrong colour. `test_the_channel_frames_are_left_alone` pins that as a decision.
+  in the wrong colour. No animation in `wizard_frames.tres` references them, and
+  `test_the_channel_frames_are_left_alone` pins that as a decision.
 
-Replacing the pack means dropping the new texture into `wizard.tres` and re-measuring
-both. The tests read the atlas the resource points at, so a swap that gets the layout
-wrong fails rather than shipping a fighter who hops, or vanishes mid-spell.
+A cast set is not played on its own clock: `Fighter._update_character_animation` scrubs it
+to real cast progress, so a one-second spell and a four-second one show a different pose at
+the same moment — the read on how close the spell is to landing.
+
+Replacing the pack means rebuilding `wizard_frames.tres` against the new sheet and
+re-measuring. `tests/test_fighter_frames.gd` reads whatever the resource points at, so a
+swap that gets the layout wrong fails rather than shipping a fighter who hops, or vanishes
+mid-spell.

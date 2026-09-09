@@ -26,8 +26,8 @@ const TARGET_PICK_RADIUS: float = 44.0
 ## packet that says "I let go of the button" is exactly the one that can go missing.
 const INPUT_HEARTBEAT_SECONDS: float = 0.1
 
-## A scene rather than `Fighter.new()` so the character atlas comes wired from
-## `client/art/wizard.tres` and can be swapped in the editor.
+## A scene rather than `Fighter.new()` so the collision shape, the character's
+## `SpriteFrames` and the draw layers all come wired from `client/scenes/fighter.tscn`.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 
 ## Which peer this client is playing. Set before adding the node to the tree.

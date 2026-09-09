@@ -82,8 +82,8 @@ test needs it — see the carve-outs below.
 - **Scenes and resources are `@export` or an authored child, not `load()`.** A scene a
   node needs is instanced in the `.tscn` that owns it, or declared
   `@export var thing: PackedScene` / `Resource` and wired in the Inspector.
-  `client/art/wizard.tres` on `FighterSprite`, and `practice_scene` on `client_main.gd`,
-  are the pattern. `load("res://…%s.tres")` string-building is the thing
+  `client/art/fighter_chrome.tres` on `Fighter`, the `SpriteFrames` on its `Character`
+  node, and `practice_scene` on `client_main.gd` are the pattern. `load("res://…%s.tres")` string-building is the thing
   `SpellBook.by_name` exists to kill. Tests and `tools/` are exempt — they are fixtures.
 - **Layout lives in `.tscn`.** The camera, view layers, HUD, join menu and audio nodes
   are authored (`client/scenes/arena_stage.tscn`, `arena_hud.tscn`, `client_main.tscn`),
