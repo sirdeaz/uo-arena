@@ -13,7 +13,6 @@ tile_set = ExtResource("2_hqm6u")
 
 [node name="Walls" type="TileMapLayer" parent="." unique_id=950548138]
 z_index = -1
-tile_map_data = PackedByteArray("AAA=")
 tile_set = ExtResource("2_hqm6u")
 
 [node name="Cover" type="TileMapLayer" parent="." unique_id=1155278066]

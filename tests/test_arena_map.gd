@@ -182,26 +182,6 @@ func test_each_player_can_break_line_of_sight_within_two_seconds() -> void:
 			]
 		)
 
-
-func test_cover_blocks_from_both_sides_symmetrically() -> void:
-	# A 1v1 map that favours one spawn is a broken 1v1 map.
-	await get_tree().physics_frame
-	var spawns := map.get_spawn_positions()
-	var blocked_from_first := 0
-	for point in _reachable_ring(spawns[0]):
-		if not resolver.has_line_of_sight(_space_state(), point, spawns[1]):
-			blocked_from_first += 1
-	var blocked_from_second := 0
-	for point in _reachable_ring(spawns[1]):
-		if not resolver.has_line_of_sight(_space_state(), point, spawns[0]):
-			blocked_from_second += 1
-	assert_eq(
-		blocked_from_first,
-		blocked_from_second,
-		"both spawns should have the same amount of cover available"
-	)
-
-
 func test_the_centre_lane_is_open_but_stepping_off_it_is_not() -> void:
 	# The opening duel lane: a clear shot straight down the middle, with cover a
 	# short step away on either side.

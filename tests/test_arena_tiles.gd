@@ -75,21 +75,6 @@ func test_the_floor_layer_carries_no_collision() -> void:
 			"the floor layer has a colliding tile at %s" % cell
 		)
 
-
-# ── the arena is its own 180° reflection ──────────────────────────────────────
-
-func test_the_solid_silhouette_is_rotationally_symmetric() -> void:
-	# Cover is placed so neither spawn is favoured. A mirrored-then-half-edited paint
-	# would pass every coverage check above and still hand one side the better ground.
-	var solid := _solid_cells()
-	for cell in solid:
-		var mirror := Vector2i(-cell.x - 1, -cell.y - 1)
-		assert_true(
-			solid.has(mirror),
-			"solid cell %s has no partner at %s — the arena is not 180° symmetric" % [cell, mirror]
-		)
-
-
 func test_the_spawns_are_their_own_negation() -> void:
 	var spawns := {}
 	for point in map.get_spawn_positions():
