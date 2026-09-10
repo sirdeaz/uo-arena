@@ -23,7 +23,8 @@ a PR. Wait to be asked.
 
 ## What an issue should carry
 
-Match the ones already in the repo (see #1–#9 for the house style):
+Match the ones already in the repo — #1–#9 set the house style, #72 and #77 are recent
+worked examples:
 
 - The problem, in terms of what a player or a maintainer actually experiences.
 - Evidence, as `file.gd:line` references — the real code, not a paraphrase of it.
@@ -42,6 +43,17 @@ Implementation goes on the branch named in the session's instructions, and the P
 says `Closes #N`. If a PR for that branch has already merged, restart the branch from the
 current `main` rather than stacking on merged history.
 
+Work each issue in its own git worktree, so an open editor's re-imports on one branch
+cannot dirty `main` or another issue's tree:
+
+```bash
+git worktree add ../uo-arena-<n> -b claude/issue-<n>-<slug> origin/main
+```
+
+Remove it once the PR merges (`git worktree remove ../uo-arena-<n>`). This is the
+recommended default, not a gate — a plain `git checkout -b` still works where worktrees
+are not to hand.
+
 ## Commands
 
 ```bash
@@ -50,9 +62,13 @@ current `main` rather than stacking on merged history.
 ./build.sh              # native + browser builds
 ```
 
-Godot is found via `$GODOT_BIN`, then `godot4`/`godot` on `PATH`. The suite needs the
-project imported first, and a fresh clone needs **two** import passes — the first reports
-errors for class names not yet registered.
+Built and tested on **Godot 4.7** — `project.godot`'s `config/features` names it and
+`config_version=5` is a 4.7 project file. `tools/godot.sh` finds the binary via
+`$GODOT_BIN`, then `godot4`/`godot` on `PATH`, and accepts any 4.x — but opening the
+project in an older 4.x rewrites every `.tscn`/`.tres` it touches into that version's
+format, so check `godot --version` before a first import. The suite needs the project
+imported first, and a fresh clone needs **two** import passes — the first reports errors
+for class names not yet registered.
 
 ## Conventions worth not relearning
 
@@ -76,27 +92,39 @@ errors for class names not yet registered.
 
 ## Editor-first layout
 
-Standard Godot, assembled in the editor, is the default. Reach for code only where a
-test needs it — see the carve-outs below.
+Standard Godot 4.7, assembled in the editor, is the default. Code is the exception, and
+an exception states its reason — a carve-out below, or something the editor genuinely
+cannot express. Tests and `tools/` are outside this rule; they are fixtures.
 
+- **A code change has to earn its place.** A new `.gd`, a build step in `_ready()`, or a
+  `load()` where a scene / `@export` / authored child would do: the issue or PR names the
+  carve-out it falls under, or says what the editor cannot express. "It was quicker in
+  code" is not that reason.
 - **Scenes and resources are `@export` or an authored child, not `load()`.** A scene a
   node needs is instanced in the `.tscn` that owns it, or declared
   `@export var thing: PackedScene` / `Resource` and wired in the Inspector.
   `client/art/fighter_chrome.tres` on `Fighter`, the `SpriteFrames` on its `Character`
   node, and `practice_scene` on `client_main.gd` are the pattern. `load("res://…%s.tres")` string-building is the thing
-  `SpellBook.by_name` exists to kill. Tests and `tools/` are exempt — they are fixtures.
+  `SpellBook.by_name` exists to kill.
 - **Layout lives in `.tscn`.** The camera, view layers, HUD, join menu and audio nodes
   are authored (`client/scenes/arena_stage.tscn`, `arena_hud.tscn`, `client_main.tscn`),
   not built in `_ready()` with `.new()` + `add_child()` and pixel constants. Anchors, not
   offsets against an assumed 1280×720.
 - **One authored scene, shared by both clients.** The networked client and the practice
   harness instance the same `arena_stage.tscn` — never two parallel `_ready()` trees kept
-  identical by memory. They drifted once already (`ArenaGround.position`, #43).
-- **One arena scene for client and server.** `res://arena/arena_map.tscn` is hand-painted;
-  the tiles own the collision (a physics layer on the obstacles bit, `kind` custom-data
-  for tent/rock/wall). Nothing describes the layout in code — `arena/arena_map.gd` reads
-  it back: `obstacle_rects()` merges the solid cells, `cover_kind_at()` reads the tile.
-  Repaint the arena in the editor; the code adapts. The server *instances* `arena_map.tscn`
+  identical by memory. They drifted once already (`ArenaGround.position`, #43). A new
+  feature reuses the authored entry scenes and their composition — `client_main.tscn`,
+  `arena_stage.tscn`, `server_main.tscn`, `arena_server.tscn` — rather than adding a
+  second bootstrap path; a parallel setup is that drift waiting to happen, and is a bug
+  even while the two copies still match.
+- **One arena scene for client and server.** `res://arena/arena_map.tscn` is hand-painted
+  and the tiles own the collision — a physics layer on the obstacles bit, and nothing
+  else. Nothing describes the layout in code: `arena/arena_map.gd` reads it back —
+  `obstacle_polygons()` lifts each painted cell's collision polygon off its `TileData`,
+  unions the touching ones with `Geometry2D.merge_polygons()` and splits the result into
+  convex pieces for the visibility graph; `bounds()` is the `Floor` layer's used rect.
+  Repaint the arena in the editor; the code adapts, and there is no grid size or field
+  size left in a `.gd` to keep in step. The server *instances* `arena_map.tscn`
   too — as the `Arena` child of `server/arena_server.tscn`, never `load()`ed in
   `_ready()`. `arena_server.tscn` (root `ArenaServer` + `Arena` + `Resolver`) and
   `server_main.tscn` (composing an authored `ArenaServer`) are the server-side
@@ -105,8 +133,9 @@ test needs it — see the carve-outs below.
   `ArenaServer.new()` is not on the must-stay-constructible list (unlike
   `Combatant` / `CombatResolver` / `PathFinder`); its three tests instance
   `arena_server.tscn` and are the only guard against a silent slide back to `.new()`.
-- **Node Groups or TileSet custom-data name a role**, read by a helper — not an exported
-  "type" enum on every instance.
+- **A per-instance role, if one is ever needed, goes in a Node Group or TileSet
+  custom-data** read by a helper — not a `type` enum on every instance. Nothing in the
+  tree needs one today; this is the shape to reach for when something does.
 
 ### Carve-outs — these stay code, by name
 
