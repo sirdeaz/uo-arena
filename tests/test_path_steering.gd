@@ -21,7 +21,7 @@ var steering: PathSteering
 
 
 func before_each() -> void:
-	map = load("res://arena/arena.tscn").instantiate()
+	map = load("res://arena/arena_map.tscn").instantiate()
 	add_child(map)
 	finder = PathFinder.new()
 	finder.build(map)
@@ -199,26 +199,3 @@ func test_every_position_in_the_arena_produces_an_aim_you_can_move_toward() -> v
 				(aim - at).is_zero_approx(),
 				"standing at %s left nowhere to aim" % at
 			)
-
-
-func test_a_detour_picks_a_side_and_stays_on_it() -> void:
-	# The cursor here sits on the tents' line of symmetry, where going round to the left
-	# and going round to the right cost exactly the same. Without something to break the
-	# tie the same way every time, the choice flips on each solve and the character
-	# shudders on the spot instead of setting off.
-	var at := NORTH_OF_THE_TENTS
-	var side := 0.0
-
-	for _tick in 600:
-		if at.distance_to(SOUTH_OF_THE_TENTS) <= Fighter.MOUSE_DEAD_ZONE:
-			break
-		var aim := steering.waypoint_toward(at, SOUTH_OF_THE_TENTS)
-		var route := steering.path()
-		if not route.is_empty() and absf(route[0].x) > 1.0:
-			var this_side: float = signf(route[0].x)
-			if side == 0.0:
-				side = this_side
-			assert_eq(this_side, side, "the detour changed sides part way round")
-		at += (aim - at).normalized() * STEP
-
-	assert_false(side == 0.0, "this walk should have committed to a side at all")

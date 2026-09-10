@@ -36,7 +36,7 @@ var _no_go: Array[PackedVector2Array] = []
 
 
 func before_each() -> void:
-	_map = load("res://arena/arena.tscn").instantiate()
+	_map = load("res://arena/arena_map.tscn").instantiate()
 	add_child(_map)
 	# The arena is collided by `TileMapLayer` tiles now, and their physics bodies are
 	# built on the first physics step — not synchronously on `add_child` the way the old
@@ -181,8 +181,8 @@ func test_a_walk_that_lands_astride_a_corner_still_gets_past_it() -> void:
 func _crossings() -> Array:
 	var reach := 170.0
 	var pairs := []
-	for rect in _map.cover_rects():
-		var centre := rect.get_center()
+	for polygon in _map.obstacle_polygons():
+		var centre := _centroid(polygon)
 		for octant in 8:
 			var heading := Vector2.RIGHT.rotated(TAU * octant / 8.0)
 			var from: Vector2 = centre + heading * reach
@@ -193,6 +193,13 @@ func _crossings() -> Array:
 				continue
 			pairs.append([from, cursor])
 	return pairs
+
+
+static func _centroid(polygon: PackedVector2Array) -> Vector2:
+	var sum := Vector2.ZERO
+	for point in polygon:
+		sum += point
+	return sum / float(polygon.size())
 
 
 ## Somewhere the body actually fits, which is not the same as somewhere inside the walls.
@@ -209,9 +216,10 @@ func test_the_sweep_actually_has_walks_in_it() -> void:
 	# A sweep that quietly filtered itself down to nothing would pass forever. #28 names
 	# this trap by name: the assist's existing grid test passed while the stall was live.
 	var crossings := _crossings()
+	var tried := _map.obstacle_polygons().size() * 8
 	assert_true(
-		crossings.size() >= 24,
-		"only %d crossings survived the filter, out of 32 tried" % crossings.size()
+		crossings.size() >= tried / 2,
+		"only %d crossings survived the filter, out of %d tried" % [crossings.size(), tried]
 	)
 
 

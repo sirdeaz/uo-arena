@@ -1,20 +1,20 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://d0485hegx0kbv"]
 
-[ext_resource type="Script" path="res://client/local_test.gd" id="1_local_test"]
-[ext_resource type="PackedScene" path="res://arena/arena.tscn" id="2_arena"]
+[ext_resource type="Script" uid="uid://7xehd2dg1cse" path="res://client/local_test.gd" id="1_local_test"]
+[ext_resource type="PackedScene" uid="uid://crg0hjmen880g" path="res://arena/arena_map.tscn" id="2_arena"]
 [ext_resource type="PackedScene" path="res://client/scenes/arena_stage.tscn" id="3_stage"]
 [ext_resource type="PackedScene" path="res://client/scenes/fighter.tscn" id="4_fighter"]
 
-[node name="LocalTest" type="Node2D"]
+[node name="LocalTest" type="Node2D" unique_id=1812499973]
 script = ExtResource("1_local_test")
 
-[node name="Arena" parent="." instance=ExtResource("2_arena")]
+[node name="Arena" parent="." unique_id=783144853 instance=ExtResource("2_arena")]
 
-[node name="Stage" parent="." instance=ExtResource("3_stage")]
+[node name="Stage" parent="." unique_id=1744232899 instance=ExtResource("3_stage")]
 
-[node name="Player" parent="." instance=ExtResource("4_fighter")]
+[node name="Player" parent="." unique_id=669219900 instance=ExtResource("4_fighter")]
 body_color = Color(0.431373, 0.776471, 1, 1)
 player_controlled = true
 
-[node name="Dummy" parent="." instance=ExtResource("4_fighter")]
+[node name="Dummy" parent="." unique_id=507452492 instance=ExtResource("4_fighter")]
 body_color = Color(0.878431, 0.494118, 0.658824, 1)

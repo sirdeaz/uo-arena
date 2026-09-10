@@ -48,7 +48,7 @@ class Player extends RefCounted:
 ## `client/` — so the dedicated-server export stays clean.
 const PLAYER_BODY_SCENE := preload("res://server/player_body.tscn")
 
-## The `Arena` child instances `res://arena/arena.tscn` — the same hand-painted scene
+## The `Arena` child instances `res://arena/arena_map.tscn` — the same hand-painted scene
 ## the client scenes instance, never `load()`ed here. Authored in `server/arena_server.tscn`.
 @onready var map: ArenaMap = $Arena
 

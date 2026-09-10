@@ -16,9 +16,9 @@ class_name PathFinder
 ## this reuses that converter rather than growing a second one: what the search routes
 ## around cannot then drift from what you see.
 ##
-## The arena suits the approach — four convex cover pieces and four walls, about twenty
-## corners, fixed at load. Joining corners is O(n²) in their count, so a map with many
-## pieces, or with concave shapes, would want a navigation mesh instead.
+## The arena suits the approach — a handful of convex cover pieces, a few dozen corners,
+## fixed at load. Joining corners is O(n²) in their count, so a map with many pieces, or
+## with concave shapes, would want a navigation mesh instead.
 
 ## Clearance beyond the player's own radius. Deliberately small: every pixel here narrows
 ## every gap, and the tightest real gap in the arena — a corner rock and the south wall —
@@ -113,20 +113,11 @@ func find_path(from: Vector2, to: Vector2) -> PackedVector2Array:
 	return _search(points, start, goal, from_visible, to_visible)
 
 
-## Every solid rectangle in the arena, in world space — cover and boundary walls alike,
-## as `ArenaMap.obstacle_rects()` reports them. The arena is tiled now, so these are the
-## same rectangles the tiles are painted over, tile-aligned; the routing graph is built
-## from exactly what the resolver raycasts against.
+## Every obstacle outline in the arena, in world space — cover and boundary alike, as
+## `ArenaMap.obstacle_polygons()` lifts them off the tiles' own collision. The routing
+## graph is built from exactly what the resolver raycasts against.
 static func obstacle_polygons(map: ArenaMap) -> Array[PackedVector2Array]:
-	var polygons: Array[PackedVector2Array] = []
-	for rect in map.obstacle_rects():
-		polygons.append(PackedVector2Array([
-			rect.position,
-			Vector2(rect.end.x, rect.position.y),
-			rect.end,
-			Vector2(rect.position.x, rect.end.y),
-		]))
-	return polygons
+	return map.obstacle_polygons()
 
 
 ## Grows a polygon outward by `amount`, or returns empty when the shape is too degenerate

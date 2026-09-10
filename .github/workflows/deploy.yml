@@ -79,7 +79,7 @@ jobs:
         # `client/*` tree, so nothing client-side — the fighter scene, the wizard atlas,
         # the palette — should reach the server PCK. Two project-level dependencies ride
         # along, and `exclude_filter` cannot drop a dependency:
-        #   - client/art/Grass-01.png (~21 KB) — the shared arena.tscn's tileset image;
+        #   - client/art/Grass-01.png (~21 KB) — the shared arena_map.tscn's tileset image;
         #   - client/ui/ui_theme.tres (<1 KB: a SystemFont name list + size, no asset) —
         #     named by project.godot's gui/theme/custom, so it is a global dependency.
         # Both are rounding errors, not bleeds. Anything else under res://client/ is a real

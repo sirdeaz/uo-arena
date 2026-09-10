@@ -97,7 +97,7 @@ var _fighter: Fighter
 
 
 func before_each() -> void:
-	_map = load("res://arena/arena.tscn").instantiate()
+	_map = load("res://arena/arena_map.tscn").instantiate()
 	add_child(_map)
 
 	var finder := PathFinder.new()
