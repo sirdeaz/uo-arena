@@ -1,26 +1,19 @@
 [gd_scene load_steps=6 format=3]
 
-[ext_resource type="Script" path="res://client/fighter.gd" id="1_fighter"]
-[ext_resource type="SpriteFrames" path="res://client/art/wizard_frames.tres" id="2_frames"]
-[ext_resource type="Resource" path="res://client/art/fighter_chrome.tres" id="3_chrome"]
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
-radius = 18.0
+[ext_resource type="PackedScene" path="res://common/body_base.tscn" id="1_base"]
+[ext_resource type="Script" path="res://client/fighter.gd" id="2_fighter"]
+[ext_resource type="SpriteFrames" path="res://client/art/wizard_frames.tres" id="3_frames"]
+[ext_resource type="Resource" path="res://client/art/fighter_chrome.tres" id="4_chrome"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_fx"]
 blend_mode = 1
 
-[node name="Fighter" type="CharacterBody2D"]
-collision_layer = 1
-collision_mask = 2
-script = ExtResource("1_fighter")
-chrome = ExtResource("3_chrome")
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-shape = SubResource("CircleShape2D_body")
+[node name="Fighter" instance=ExtResource("1_base")]
+script = ExtResource("2_fighter")
+chrome = ExtResource("4_chrome")
 
 [node name="Character" type="AnimatedSprite2D" parent="."]
-sprite_frames = ExtResource("2_frames")
+sprite_frames = ExtResource("3_frames")
 animation = &"idle_down"
 autoplay = "idle_down"
 centered = false

@@ -1,11 +1,13 @@
 extends TestCase
 
-## `client/scenes/fighter.tscn` is authored now, not built in `Fighter._ready()`. These
-## pin the authored nodes to the code-side source of truth — `common/constants.gd` for
-## the body, `client/art/wizard_frames.tres` for the character's animations, `SpellFX`
-## for the aura material, the `FighterChrome` script for the overhead measurements — so a
-## change to one the scene did not follow fails here rather than as a fighter who hops,
-## vanishes, or stops colliding. It is the client-side twin of `tests/test_player_body.gd`.
+## `client/scenes/fighter.tscn` is authored now, not built in `Fighter._ready()`, and it
+## inherits `common/body_base.tscn` for the circle and the collision layers. These pin
+## the authored nodes to the code-side source of truth — `client/art/wizard_frames.tres`
+## for the character's animations, `SpellFX` for the aura material, the `FighterChrome`
+## script for the overhead measurements — so a change to one the scene did not follow
+## fails here rather than as a fighter who hops, vanishes, or stops colliding. The shared
+## body radius and layer bits are pinned once in `tests/test_body_base.gd`; this is the
+## client-side twin of `tests/test_player_body.gd`.
 
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
 const FRAMES := preload("res://client/art/wizard_frames.tres")
@@ -23,28 +25,20 @@ func after_each() -> void:
 	fighter.queue_free()
 
 
-func test_it_sits_on_the_players_layer_and_collides_only_with_obstacles() -> void:
-	assert_eq(
-		fighter.collision_layer,
-		Constants.LAYER_PLAYERS,
-		"the client body must be on the players layer, the same as server/player_body.tscn"
+func test_it_inherits_the_shared_body_base() -> void:
+	# The circle and layer numbers are pinned in tests/test_body_base.gd. This only
+	# checks the inheritance came through — an inherited-scene override that does not
+	# survive re-import fails here rather than as a fighter who stops colliding.
+	assert_true(fighter is Fighter, "the inherited scene must still resolve to Fighter")
+	var shape_node := fighter.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	assert_true(
+		shape_node != null and shape_node.shape is CircleShape2D,
+		"the base's CollisionShape2D must come through the inheritance"
 	)
 	assert_eq(
 		fighter.collision_mask,
 		Constants.LAYER_OBSTACLES,
-		"it must collide with cover only — players pass through each other and block no spell"
-	)
-
-
-func test_its_circle_is_exactly_the_shared_player_radius() -> void:
-	var shape_node := fighter.get_node("CollisionShape2D") as CollisionShape2D
-	assert_true(shape_node != null, "the authored fighter needs a CollisionShape2D child")
-	var circle := shape_node.shape as CircleShape2D
-	assert_true(circle != null, "the footprint should be a circle, like the server body")
-	assert_almost_eq(
-		circle.radius,
-		Constants.PLAYER_RADIUS,
-		"the authored radius has drifted from Constants.PLAYER_RADIUS"
+		"the base's collision mask must come through the inheritance"
 	)
 
 

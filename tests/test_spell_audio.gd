@@ -13,11 +13,15 @@ const ALL_CUES := [
 	SpellAudio.Cue.IMPACT,
 ]
 
+const AUDIO_SCENE := preload("res://client/scenes/spell_audio.tscn")
+
 var audio: SpellAudio
 
 
 func before_each() -> void:
-	audio = SpellAudio.new()
+	# The voice pool is authored now, so the cue-playing tests need the scene, not a
+	# bare `SpellAudio.new()` (which has no voices).
+	audio = AUDIO_SCENE.instantiate()
 	add_child(audio)
 
 
