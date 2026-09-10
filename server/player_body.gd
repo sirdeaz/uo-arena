@@ -11,8 +11,9 @@ class_name PlayerBody
 ## does not manufacture a correction on every frame.
 ##
 ## Layout — the circle, its radius, and the collision layers — is authored in
-## `server/player_body.tscn` now, not built here. The `.tscn` mirrors
+## `common/body_base.tscn`, which `server/player_body.tscn` inherits and `Fighter`
+## inherits too, so the shared trunk is one scene. The base mirrors
 ## `Constants.PLAYER_RADIUS` / `LAYER_PLAYERS` / `LAYER_OBSTACLES` by hand;
-## `tests/test_player_body.gd` fails if the two drift. Obstacles only in the mask:
+## `tests/test_body_base.gd` fails if the two drift. Obstacles only in the mask:
 ## players pass through one another and never block a spell — the same choice `Fighter`
 ## makes, and the one `test_line_of_sight.gd` pins.
