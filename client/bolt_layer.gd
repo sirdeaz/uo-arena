@@ -17,12 +17,6 @@ var _effects: Array[Dictionary] = []
 var _time: float = 0.0
 
 
-func _ready() -> void:
-	# Above the fighters and the sight line, which sit at 0 and 5.
-	z_index = 6
-	material = SpellFX.additive_material()
-
-
 ## Records a spell that connected, drawn from `from` to `to` for `EFFECT_SECONDS`.
 func add_effect(from: Vector2, to: Vector2, spell: SpellData) -> void:
 	_effects.append({
