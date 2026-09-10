@@ -91,6 +91,7 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 func _process(delta: float) -> void:
 	_run_dummy(delta)
 	_update_aim()
+	_stage.follow_camera(player.position, map.bounds())
 	_update_hud()
 	_sight_line.queue_redraw()
 

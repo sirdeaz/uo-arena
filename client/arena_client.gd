@@ -61,8 +61,8 @@ var _seconds_since_input_sent: float = 0.0
 
 
 func _ready() -> void:
-	# Fixed at the origin: at 0.85 zoom a 1280×720 window shows 1506×847, and the arena
-	# fits inside that, so all ten players are always on screen and nothing has to follow.
+	# The camera rides the local player from here on (`_update_camera`). `make_current`
+	# is all `_ready` does with it — the shared stage authors the zoom.
 	($Stage/Camera2D as Camera2D).make_current()
 
 	_sight_line.draw.connect(_draw_sight_line)
@@ -173,8 +173,18 @@ func last_event() -> String:
 func _physics_process(delta: float) -> void:
 	_send_input(delta)
 	_update_aim()
+	_update_camera()
 	_update_hud()
 	_sight_line.queue_redraw()
+
+
+## The camera rides your own fighter. Until it exists — the roster has not landed yet —
+## the view holds the arena centre rather than pointing at nothing. A death does not
+## remove your fighter (respawn moves it back), so the camera stays with it through one.
+func _update_camera() -> void:
+	var fighter := _local_fighter()
+	var focus := fighter.position if fighter != null else map.bounds().get_center()
+	_stage.follow_camera(focus, map.bounds())
 
 
 ## Turns you toward whoever you have selected. Only the local client knows its own

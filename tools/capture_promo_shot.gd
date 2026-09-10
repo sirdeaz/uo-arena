@@ -33,6 +33,8 @@ func _ready() -> void:
 	# Let the pose settle and the fighters redraw before grabbing the frame.
 	for _i in 4:
 		await get_tree().process_frame
+	_frame_camera(scene)
+	await get_tree().process_frame
 	await RenderingServer.frame_post_draw
 
 	var image := get_viewport().get_texture().get_image()
@@ -68,6 +70,19 @@ func _pose(scene: Node2D) -> void:
 
 	scene.player.queue_redraw()
 	scene.dummy.queue_redraw()
+
+
+## In game the camera rides the local player; a promo still wants both fighters and the
+## sight line between them. Stop the harness's per-frame follow and centre the shot on
+## the pair, through the same clamp the game uses.
+func _frame_camera(scene: Node2D) -> void:
+	scene.set_process(false)
+	var camera := scene.get_node("Stage/Camera2D") as Camera2D
+	camera.global_position = ArenaStage.camera_target(
+		(scene.player.position + scene.dummy.position) * 0.5,
+		scene.map.bounds(),
+		camera.get_viewport_rect().size / camera.zoom,
+	)
 
 
 func _hold_cast(fighter: Fighter, spell_name: String, progress: float) -> void:
