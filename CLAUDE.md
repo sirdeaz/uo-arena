@@ -80,12 +80,12 @@ for class names not yet registered.
   `ArenaServer.pick_spawn` and `FighterSprite.facing_for` all exist in that shape for
   that reason. It survives the editor-first rule below — an authored node may *call* the
   static, but the decision itself keeps no node reference.
-- **`server/` holds no rendering code**, so the Dedicated Server export stays lean. The
-  one seam is the shared arena scene: it references a `TileSet`, the server runs its
-  `TileMapLayer`s headless for collision, and CI builds the dedicated-server export and
-  fails if the character art leaks in or the PCK balloons (`.github/workflows/deploy.yml`).
-  `server/player_body.gd`'s collision body is physics, not rendering, and stays the
-  documented exception.
+- **The server simulates; it never renders.** Nothing under `server/` touches a drawing
+  node, a texture or audio — the dedicated-server export stays headless, and the whole
+  sim runs in the socket-free test suite. CI builds that export and fails the deploy if
+  art leaks in or the PCK grows (`.github/workflows/deploy.yml`). Two documented
+  exceptions: the shared arena scene carries a `TileSet` the server runs headless for
+  collision, and `server/player_body.gd`'s body is physics, not rendering.
 - **Every colour goes through `client/palette.gd`.** One meaning per colour, and
   `tests/test_palette.gd` fails on a raw hex literal anywhere in `client/`. A variant of an
   existing signal should be a new named *alpha*, not a new hue.
@@ -102,40 +102,27 @@ cannot express. Tests and `tools/` are outside this rule; they are fixtures.
   code" is not that reason.
 - **Scenes and resources are `@export` or an authored child, not `load()`.** A scene a
   node needs is instanced in the `.tscn` that owns it, or declared
-  `@export var thing: PackedScene` / `Resource` and wired in the Inspector.
-  `client/art/fighter_chrome.tres` on `Fighter`, the `SpriteFrames` on its `Character`
-  node, and `practice_scene` on `client_main.gd` are the pattern. `load("res://…%s.tres")` string-building is the thing
-  `SpellBook.by_name` exists to kill.
+  `@export var thing: PackedScene` / `Resource` and wired in the Inspector
+  (`fighter_chrome.tres` on `Fighter` is the pattern). Path-building a `load("res://…")`
+  is the thing `SpellBook.by_name` exists to kill.
 - **Layout lives in `.tscn`.** The camera, view layers, HUD, join menu and audio nodes
   are authored (`client/scenes/arena_stage.tscn`, `arena_hud.tscn`, `client_main.tscn`),
   not built in `_ready()` with `.new()` + `add_child()` and pixel constants. Anchors, not
   offsets against an assumed 1280×720.
-- **One authored scene, shared by both clients.** The networked client and the practice
-  harness instance the same `arena_stage.tscn` — never two parallel `_ready()` trees kept
-  identical by memory. They drifted once already (`ArenaGround.position`, #43). A new
-  feature reuses the authored entry scenes and their composition — `client_main.tscn`,
-  `arena_stage.tscn`, `server_main.tscn`, `arena_server.tscn` — rather than adding a
-  second bootstrap path; a parallel setup is that drift waiting to happen, and is a bug
-  even while the two copies still match.
-- **One arena scene for client and server.** `res://arena/arena_map.tscn` is hand-painted
-  and the tiles own the collision — a physics layer on the obstacles bit, and nothing
-  else. Nothing describes the layout in code: `arena/arena_map.gd` reads it back —
-  `obstacle_polygons()` lifts each painted cell's collision polygon off its `TileData`,
-  unions the touching ones with `Geometry2D.merge_polygons()` and splits the result into
-  convex pieces for the visibility graph; `bounds()` is the `Floor` layer's used rect.
-  Repaint the arena in the editor; the code adapts, and there is no grid size or field
-  size left in a `.gd` to keep in step. The server *instances* `arena_map.tscn`
-  too — as the `Arena` child of `server/arena_server.tscn`, never `load()`ed in
-  `_ready()`. `arena_server.tscn` (root `ArenaServer` + `Arena` + `Resolver`) and
-  `server_main.tscn` (composing an authored `ArenaServer`) are the server-side
-  counterparts of `arena_stage.tscn` / `client_main.tscn`: a fixed node assembled in
-  `_ready()` with `.new()` + `add_child()` is a bug — author it. The bare
-  `ArenaServer.new()` is not on the must-stay-constructible list (unlike
-  `Combatant` / `CombatResolver` / `PathFinder`); its three tests instance
-  `arena_server.tscn` and are the only guard against a silent slide back to `.new()`.
-- **A per-instance role, if one is ever needed, goes in a Node Group or TileSet
-  custom-data** read by a helper — not a `type` enum on every instance. Nothing in the
-  tree needs one today; this is the shape to reach for when something does.
+- **One authored scene per thing, reused everywhere — never a second copy kept in step
+  by memory.** The networked client and the practice harness instance the same
+  `arena_stage.tscn`; client and server instance the same `arena/arena_map.tscn`. A new
+  feature reuses the authored entry scenes (`client_main` / `arena_stage` / `server_main`
+  / `arena_server`), it does not add a parallel bootstrap. This drifted once already
+  (`ArenaGround.position`, #43), and a fork is a bug even while the two copies still match.
+- **The arena is read back, not described.** `arena/arena_map.tscn` is hand-painted and
+  the tiles own the collision — a physics layer on the obstacles bit, nothing else.
+  `arena/arena_map.gd` reads it: `obstacle_polygons()` unions the painted tiles' own
+  collision and splits it into convex pieces for the pathfinder; `bounds()` is the
+  `Floor` layer's rect. Repaint in the editor and the code follows — no grid size or
+  field size lives in a `.gd`. The server gets the arena as the authored `Arena` child of
+  `server/arena_server.tscn`, not a `load()` in `_ready()` — same as `arena_stage.tscn`
+  on the client; a fixed tree built with `.new()` in `_ready()` is a bug.
 
 ### Carve-outs — these stay code, by name
 
