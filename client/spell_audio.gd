@@ -25,10 +25,9 @@ const SAMPLE_RATE: int = 22050
 
 ## Cues overlap constantly — a fizzle chain fires release, fizzle and start inside a few
 ## hundred milliseconds — so they get a small pool of players rather than cutting each
-## other off.
+## other off. The pool itself is authored in `client/scenes/spell_audio.tscn`; this is
+## the count the tests hold it to.
 const VOICE_COUNT: int = 6
-
-const MASTER_VOLUME_DB: float = -8.0
 
 ## Each cue is a short shaped tone. Sweeping downward reads as failure and upward as
 ## gathering, so the two halves of the cast are told apart by shape rather than pitch
@@ -76,11 +75,12 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	for i in VOICE_COUNT:
-		var player := AudioStreamPlayer.new()
-		player.volume_db = MASTER_VOLUME_DB
-		add_child(player)
-		_voices.append(player)
+	# The voice pool is authored in `client/scenes/spell_audio.tscn` — six
+	# `AudioStreamPlayer` children at -8 dB. Gather them rather than build them; a bare
+	# `SpellAudio.new()` with no children simply has no voices and `play()` reports false.
+	for child in get_children():
+		if child is AudioStreamPlayer:
+			_voices.append(child)
 
 
 ## Plays a cue, returning whether it actually started. Nothing here waits on a browser's

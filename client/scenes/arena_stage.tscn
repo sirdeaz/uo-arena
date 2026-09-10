@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://client/scenes/arena_stage.gd" id="0_stage"]
 [ext_resource type="Script" path="res://server/combat_resolver.gd" id="1_resolver"]
 [ext_resource type="Script" path="res://client/bolt_layer.gd" id="2_bolts"]
-[ext_resource type="Script" path="res://client/spell_audio.gd" id="3_audio"]
+[ext_resource type="PackedScene" path="res://client/scenes/spell_audio.tscn" id="3_audio"]
 [ext_resource type="PackedScene" path="res://client/scenes/arena_hud.tscn" id="4_hud"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_bolts"]
@@ -26,7 +26,6 @@ z_index = 6
 material = SubResource("CanvasItemMaterial_bolts")
 script = ExtResource("2_bolts")
 
-[node name="Audio" type="Node" parent="."]
-script = ExtResource("3_audio")
+[node name="Audio" parent="." instance=ExtResource("3_audio")]
 
 [node name="ArenaHud" parent="." instance=ExtResource("4_hud")]
