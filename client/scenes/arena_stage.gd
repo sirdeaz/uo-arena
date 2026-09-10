@@ -7,6 +7,35 @@ class_name ArenaStage
 ## parts that genuinely differ (a networked target ring vs the practice route overlay).
 
 @onready var _audio: SpellAudio = $Audio
+@onready var _camera: Camera2D = $Camera2D
+
+
+## Points the shared camera at `focus` — the local player's fighter — clamped so it never
+## scrolls the painted arena off the screen. Both clients call this every frame: the
+## practice harness with its `$Player`, the networked client with the local peer's
+## fighter, or the arena centre while it has none.
+func follow_camera(focus: Vector2, arena: Rect2) -> void:
+	_camera.global_position = camera_target(
+		focus, arena, get_viewport_rect().size / _camera.zoom
+	)
+
+
+## `focus` clamped so a `view`-sized rectangle centred on the result stays inside
+## `arena`. On an axis where the arena is smaller than the view there is nothing to clamp
+## against — the result centres on the arena there instead, so a wall shows a margin
+## rather than the camera picking a side. Pure, so `tests/test_arena_stage.gd` can walk
+## the corners with no viewport.
+static func camera_target(focus: Vector2, arena: Rect2, view: Vector2) -> Vector2:
+	var result := focus
+	for axis in 2:
+		if arena.size[axis] <= view[axis]:
+			result[axis] = arena.position[axis] + arena.size[axis] * 0.5
+		else:
+			var margin := view[axis] * 0.5
+			result[axis] = clampf(
+				focus[axis], arena.position[axis] + margin, arena.end[axis] - margin
+			)
+	return result
 
 
 ## Wires a fighter's four cast signals to the shared audio node, so a cast you start and
