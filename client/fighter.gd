@@ -117,7 +117,7 @@ var _travel_speed: float = 0.0
 ## from `velocity`, for the same reason `_travel_speed` is: a fighter the server owns
 ## has no velocity of its own. It is held rather than reset when a fighter stops, so
 ## standing still leaves you facing the way you were last going.
-var _facing: FighterSprite.Facing = FighterSprite.Facing.DOWN
+var _facing: Facing = Facing.DOWN
 
 ## Who this fighter is casting at, when anyone knows. A caster turns to face their
 ## target — standing still and throwing a flamestrike over your shoulder reads as a
@@ -303,6 +303,115 @@ static func waypoint_direction_toward(from: Vector2, target: Vector2) -> Vector2
 	return offset.normalized()
 
 
+# ── Animation: which way this fighter is pointing, and what posture it's in ───────
+#
+# Pulled in from `client/fighter_sprite.gd` (#81) — a `class_name` on a RefCounted that
+# nothing ever instantiated. The decision belongs here for the same reason
+# `movement_direction_toward` above does: it needs no scene tree or clock to test, and
+# `_update_character_animation` below is the only caller. Grouped under this one header
+# rather than scattered by kind, so a reader can still hold "everything about picking an
+# animation" in one place.
+#
+# The frames themselves — regions, per-heading registration, loop flags, playback speed
+# — live in `client/art/wizard_frames.tres`, a `SpriteFrames` resource authored in the
+# editor and assigned to the `Character` `AnimatedSprite2D` in `client/scenes/fighter.tscn`.
+# Nothing here sets a frame up; `_update_character_animation` only names one and calls
+# `play()` on it.
+#
+# What this may say: posture and heading, and nothing else. Health, status, cast
+# progress, which spell, whose body this is: every one of those stays a `_draw()` call in
+# a palette colour, because ten fighters wear this same robe and one hooded robe cannot
+# be told from another at a glance. See `docs/art-direction.md`.
+
+## Which way a fighter is pointing. UO plays on a diagonal grid and this pack has four
+## headings, so movement resolves to the nearest of them.
+enum Facing { DOWN, UP, RIGHT, LEFT }
+
+## Posture. Idle and walk share one set of frames — the pack draws no separate standing
+## pose — and are told apart by how fast that set is played, which the `SpriteFrames`
+## resource does with two animations over the same frames.
+enum Anim { IDLE, WALK, CAST }
+
+## Speed, in px/s, above which a fighter is walking rather than standing. Well under
+## `PLAYER_MOVE_SPEED`, and well above the drift a server correction produces while a
+## player stands still — otherwise a stationary remote fighter moonwalks on every
+## snapshot. Gameplay feel rather than a property of the art, so it stays in code.
+const WALK_SPEED_THRESHOLD: float = 12.0
+
+## Movement shorter than this in one step says nothing about which way anyone is
+## pointing, so the previous heading is kept. Without it a fighter pinned against a
+## tent, sliding a fraction of a pixel a frame, spins on the spot.
+const FACING_EPSILON: float = 0.5
+
+## Which heading `direction` points at, or `previous` when it points nowhere.
+##
+## Ties go to the horizontal. A player walking exactly diagonally is drawn facing along
+## the duel lane rather than up or down it, which is the read that matters: the lane is
+## east-west and so is almost every shot fired down it.
+static func facing_for(direction: Vector2, previous: Facing) -> Facing:
+	if direction.length() < FACING_EPSILON:
+		return previous
+	if absf(direction.x) >= absf(direction.y):
+		return Facing.RIGHT if direction.x > 0.0 else Facing.LEFT
+	# Godot's y grows downward, so a positive y is toward the bottom of the screen.
+	return Facing.DOWN if direction.y > 0.0 else Facing.UP
+
+
+## Which heading to show, given everything the client knows about a fighter this frame.
+##
+## A caster faces what they are casting at; everyone else faces where they are going. Aim
+## wins because it is the more deliberate act: a mage side-stepping behind a tent while
+## throwing a spell down the lane is pointing at the spell, not at the tent.
+##
+## `aim` is `null` for every fighter nobody has named a target to — a snapshot carries
+## positions and state, never intent, so every remote body falls back to travel and a
+## remote mage casting on the spot faces wherever it last walked. That is the known cost
+## of deriving heading client-side instead of paying for a ninth slot in the record; it
+## is written down in `docs/sprite-pipeline-readiness.md` rather than hidden here.
+static func heading_for(
+	casting: bool, aim: Variant, from: Vector2, travelled: Vector2, previous: Facing
+) -> Facing:
+	if casting and aim != null:
+		var at: Vector2 = aim
+		return facing_for(at - from, previous)
+	return facing_for(travelled, previous)
+
+
+## Which posture a fighter in `state`, travelling at `speed` px/s, should be showing.
+##
+## Casting wins over walking: you can walk while casting in this game, and what the
+## opponent needs off the silhouette is that a spell is coming, not that feet are
+## moving. The mantra overhead says which spell; this only says that there is one.
+static func animation_for(state: EntityState.State, speed: float) -> Anim:
+	if state == EntityState.State.CASTING:
+		return Anim.CAST
+	if speed > WALK_SPEED_THRESHOLD:
+		return Anim.WALK
+	return Anim.IDLE
+
+
+## The name of the `SpriteFrames` animation for a posture and a heading, e.g. `walk_left`.
+## Passed straight to `AnimatedSprite2D.play` by `_update_character_animation`, and
+## `tests/test_fighter_frames.gd` checks the pack actually carries every name this can
+## return.
+static func animation_name(anim: Anim, facing: Facing) -> StringName:
+	var posture := "idle"
+	match anim:
+		Anim.WALK:
+			posture = "walk"
+		Anim.CAST:
+			posture = "cast"
+	var heading := "down"
+	match facing:
+		Facing.UP:
+			heading = "up"
+		Facing.RIGHT:
+			heading = "right"
+		Facing.LEFT:
+			heading = "left"
+	return StringName("%s_%s" % [posture, heading])
+
+
 ## The steering this player is asking for, before any rule is applied to it. Public
 ## because a networked client has to send the server the very same direction it is
 ## predicting with locally — if the two disagreed, every step would need correcting.
@@ -342,14 +451,14 @@ func _update_character_animation() -> void:
 		return
 
 	var state := combatant.entity_state
-	var posture := FighterSprite.animation_for(state.current_state, _travel_speed)
-	var wanted := FighterSprite.animation_name(posture, _facing)
+	var posture := animation_for(state.current_state, _travel_speed)
+	var wanted := animation_name(posture, _facing)
 
 	var count := _character.sprite_frames.get_frame_count(wanted)
 	if count <= 0:
 		return
 
-	if posture == FighterSprite.Anim.CAST and state.current_spell != null \
+	if posture == Anim.CAST and state.current_spell != null \
 			and state.current_spell.cast_time_seconds > 0.0:
 		if _character.animation != wanted:
 			_character.play(wanted)
@@ -387,14 +496,14 @@ func aim_at(target: Variant) -> void:
 
 
 ## Which way this fighter is pointing. Public so a test can read it without drawing.
-func facing() -> FighterSprite.Facing:
+func facing() -> Facing:
 	return _facing
 
 
-## Hands the frame's facts to `FighterSprite.heading_for` and keeps the answer. The
-## decision itself lives there, where a test can call it without a scene tree.
+## Hands the frame's facts to `heading_for` above and keeps the answer. The decision
+## itself is a static, callable without a scene tree — see the section above.
 func _update_facing(travelled: Vector2) -> void:
-	_facing = FighterSprite.heading_for(
+	_facing = heading_for(
 		combatant.entity_state.current_state == EntityState.State.CASTING,
 		_aim_at,
 		global_position,

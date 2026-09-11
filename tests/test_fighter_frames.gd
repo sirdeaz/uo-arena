@@ -10,12 +10,12 @@ extends TestCase
 ## its 3.6 px offset makes a fighter hop sideways every time it turns; a cast set that
 ## loops turns the wind-up into a spinning animation instead of a read on progress.
 
-const IDLE := FighterSprite.Anim.IDLE
-const WALK := FighterSprite.Anim.WALK
-const CAST := FighterSprite.Anim.CAST
+const IDLE := Fighter.Anim.IDLE
+const WALK := Fighter.Anim.WALK
+const CAST := Fighter.Anim.CAST
 const HEADINGS := [
-	FighterSprite.Facing.DOWN, FighterSprite.Facing.UP,
-	FighterSprite.Facing.LEFT, FighterSprite.Facing.RIGHT,
+	Fighter.Facing.DOWN, Fighter.Facing.UP,
+	Fighter.Facing.LEFT, Fighter.Facing.RIGHT,
 ]
 
 const ALPHA_FLOOR: float = 16.0 / 255.0
@@ -71,7 +71,7 @@ func _standing_x(at: AtlasTexture) -> float:
 func test_every_posture_and_heading_the_client_can_play_exists() -> void:
 	for anim in [IDLE, WALK, CAST]:
 		for facing in HEADINGS:
-			var name := FighterSprite.animation_name(anim, facing)
+			var name := Fighter.animation_name(anim, facing)
 			assert_true(
 				_frames.has_animation(name),
 				"wizard_frames.tres has no animation '%s' — the fighter would play nothing" % name
@@ -81,15 +81,15 @@ func test_every_posture_and_heading_the_client_can_play_exists() -> void:
 func test_walk_and_idle_run_six_frames_and_a_cast_runs_four() -> void:
 	for facing in HEADINGS:
 		assert_eq(
-			_frames.get_frame_count(FighterSprite.animation_name(WALK, facing)), 6,
+			_frames.get_frame_count(Fighter.animation_name(WALK, facing)), 6,
 			"a walk set is six frames in this pack"
 		)
 		assert_eq(
-			_frames.get_frame_count(FighterSprite.animation_name(IDLE, facing)), 6,
+			_frames.get_frame_count(Fighter.animation_name(IDLE, facing)), 6,
 			"idle plays the same six frames as the walk"
 		)
 		assert_eq(
-			_frames.get_frame_count(FighterSprite.animation_name(CAST, facing)), 4,
+			_frames.get_frame_count(Fighter.animation_name(CAST, facing)), 4,
 			"a cast set is four frames"
 		)
 
@@ -110,7 +110,7 @@ func test_no_frame_the_client_can_play_is_blank() -> void:
 	# vanish mid-walk or mid-spell.
 	for anim in [IDLE, WALK, CAST]:
 		for facing in HEADINGS:
-			var name := FighterSprite.animation_name(anim, facing)
+			var name := Fighter.animation_name(anim, facing)
 			for index in _frames.get_frame_count(name):
 				assert_true(
 					_standing_x(_frame_atlas(name, index)) >= 0.0,
@@ -123,9 +123,9 @@ func test_every_heading_stands_in_the_same_place() -> void:
 	# feet land at the same x, so a fighter does not hop sideways when it turns. Walk
 	# frames only — a staff or a flame dipping below the hem of a cast frame makes its
 	# lowest row something other than the feet.
-	var reference := _standing_x(_frame_atlas(FighterSprite.animation_name(WALK, HEADINGS[0]), 0))
+	var reference := _standing_x(_frame_atlas(Fighter.animation_name(WALK, HEADINGS[0]), 0))
 	for facing in HEADINGS:
-		var name := FighterSprite.animation_name(WALK, facing)
+		var name := Fighter.animation_name(WALK, facing)
 		for index in _frames.get_frame_count(name):
 			var standing := _standing_x(_frame_atlas(name, index))
 			assert_true(
@@ -139,8 +139,8 @@ func test_every_heading_stands_in_the_same_place() -> void:
 func test_the_left_set_carries_its_own_correction() -> void:
 	# The one adjustment in the pack. If a refactor drops the margin on the left frames
 	# this fails, and the left-facing walk starts hopping again.
-	var left := _frame_atlas(FighterSprite.animation_name(WALK, FighterSprite.Facing.LEFT), 0)
-	var down := _frame_atlas(FighterSprite.animation_name(WALK, FighterSprite.Facing.DOWN), 0)
+	var left := _frame_atlas(Fighter.animation_name(WALK, Fighter.Facing.LEFT), 0)
+	var down := _frame_atlas(Fighter.animation_name(WALK, Fighter.Facing.DOWN), 0)
 	assert_true(
 		left.margin.position.x > 0.0,
 		"the left set sits ~3.6px left in its cells and needs a margin to pull it back"
@@ -165,8 +165,8 @@ func test_the_channel_frames_are_left_alone() -> void:
 func test_idle_plays_slower_than_walk() -> void:
 	for facing in HEADINGS:
 		assert_true(
-			_frames.get_animation_speed(FighterSprite.animation_name(IDLE, facing))
-			< _frames.get_animation_speed(FighterSprite.animation_name(WALK, facing)),
+			_frames.get_animation_speed(Fighter.animation_name(IDLE, facing))
+			< _frames.get_animation_speed(Fighter.animation_name(WALK, facing)),
 			"idle should tick over gently — a paced walk, not a frozen frame"
 		)
 
@@ -176,6 +176,6 @@ func test_a_cast_set_does_not_loop() -> void:
 	# about to land — not restart the wind-up.
 	for facing in HEADINGS:
 		assert_false(
-			_frames.get_animation_loop(FighterSprite.animation_name(CAST, facing)),
+			_frames.get_animation_loop(Fighter.animation_name(CAST, facing)),
 			"a cast set that loops turns the wind-up into a spin"
 		)
