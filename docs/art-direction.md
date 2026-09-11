@@ -59,9 +59,9 @@ Concretely, what the sprite is **not** allowed to do, and what holds each one:
 - **Provenance.** Anything sourced outside the repo needs its licence recorded next to it,
   the way `client/fonts/OFL.txt` is. `client/art/README.md` currently records that this
   pack's licence is *unsettled*, which is the honest state, not the finished one.
-- **The world.** Floor and cover are still derived from collision shapes, and
-  `ArenaView`'s "no art assets" invariant is untouched by this change. Retiring it is a
-  separate decision (#22).
+- **The world.** Floor, walls and cover are authored `TileMapLayer`s in
+  `arena/arena_map.tscn` now — `ArenaView` and its "no art assets" invariant were
+  retired in the arena merge (#51–#55), which is what #35 asked for.
 - **Heading.** Now supplied, and it is the one read the art *does* carry. That is a
   deliberate exception to the rule above rather than a hole in it: which way someone is
   pointing is a spatial fact about a body, and drawing a spatial fact anywhere but on the

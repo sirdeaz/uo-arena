@@ -56,14 +56,6 @@ static func crackle_seed(time: float, salt: int = 0) -> int:
 	return int(time * CRACKLE_HZ) * 977 + salt
 
 
-## An additive material. Additive is what sells energy: overlapping passes accumulate
-## toward white, so a shape looks lit from within rather than painted on.
-static func additive_material() -> CanvasItemMaterial:
-	var material := CanvasItemMaterial.new()
-	material.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
-	return material
-
-
 ## Draws a line three times — a wide dim halo, a body, then a thin near-white core.
 ## Stacked additively that reads as a glowing filament rather than a coloured stroke.
 static func draw_glow_line(

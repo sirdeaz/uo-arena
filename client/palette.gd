@@ -26,11 +26,12 @@ class_name Palette
 # Everything signals are drawn *over*: the arena itself, and UI chrome. These are
 # deliberately close to one another and low in contrast; nothing here is a read.
 #
-# The arena is painted from `client/art/Grass-01.png` now (see
-# `client/scenes/arena_ground.tscn`), so `FLOOR`, `COVER_FILL`, `TENT_DOOR` and the
-# `GRID` set below no longer reach a `_draw` call. They are kept as the written brief the
-# tileset was drawn to match, and as the colours
-# `tests/test_palette.gd` still read — not because anything renders them.
+# The arena is painted from `client/art/Grass-01.png` now, sliced by
+# `arena/arena_tileset.tres` onto the `Floor` / `Walls` / `Cover` `TileMapLayer`s in
+# `arena/arena_map.tscn`, so `FLOOR`, `COVER_FILL`, `TENT_DOOR` and the `GRID` set below
+# no longer reach a `_draw` call. They are kept as the written brief the tileset was
+# drawn to match, and as the colours `tests/test_palette.gd` still read — not because
+# anything renders them.
 
 const FLOOR := Color("#1b1f2a")
 const WALL := Color("#2b2f3a")
@@ -218,15 +219,3 @@ const SPELL_CURE := Color("#b98cff")
 ## For a spell added without a colour of its own. Deliberately drab: an unstyled spell
 ## should look unfinished rather than quietly pass for a real one.
 const SPELL_UNKNOWN := Color("#d8d8d8")
-
-
-# ── Diagnostic ────────────────────────────────────────────────────────────────────
-
-## Cover that `ArenaView` does not know how to draw, painted as a bounding box so it is
-## visibly there and visibly wrong.
-##
-## Deliberately outside the palette's language rather than part of it. Every other colour
-## here is chosen to sit alongside its neighbours; this one is chosen to clash with all of
-## them, because anything wearing it is a bug and the alternative — cover that blocks
-## spells while drawing nothing — is the worst failure this game has.
-const UNDRAWABLE := Color("#ff00d0")
