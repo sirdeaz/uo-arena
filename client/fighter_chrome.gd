@@ -2,8 +2,8 @@ extends Resource
 class_name FighterChrome
 
 ## The measurements for everything drawn *around* a fighter — the health bar, the status
-## rings, the mantra, the ring under its feet. Posture and heading live in `FighterSprite`;
-## these are the reads layered over the top.
+## rings, the mantra, the ring under its feet. Posture and heading live on `Fighter`
+## itself; these are the reads layered over the top.
 ##
 ## A `Resource`, so they tune in the inspector next to the sprite rather than as constants
 ## in `client/fighter.gd`. `client/art/fighter_chrome.tres` is wired into
@@ -15,7 +15,7 @@ class_name FighterChrome
 ## Hue. Every colour still comes from `client/palette.gd` — these are only sizes and
 ## offsets. And gameplay feel: the burst duration, the prediction thresholds and the
 ## dead zones stay `const` in `client/fighter.gd`, for the same reason
-## `FighterSprite.WALK_SPEED_THRESHOLD` does — a number the netcode leans on is not a
+## `Fighter.WALK_SPEED_THRESHOLD` does — a number the netcode leans on is not a
 ## property of how the fighter looks.
 ##
 ## The `.tres` restates every default below so the resource opens with real values, and

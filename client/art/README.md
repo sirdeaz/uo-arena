@@ -37,7 +37,7 @@ The fighters. One strip of 46 frames, 79×65 each — 3634×65 in total. `wizard
 four-frame cast for each of down, up, right and left, plus four idle sets that replay the
 walk frames slowly — and `client/scenes/fighter.tscn` assigns it to the `Character`
 `AnimatedSprite2D` on every fighter. Nothing in code sets a frame up: `Fighter` names an
-animation (`FighterSprite.animation_name`) and calls `play()` on it as the fighter moves
+animation (`Fighter.animation_name`) and calls `play()` on it as the fighter moves
 or casts. The six-frame channel set (frames 40–45) is left out of the resource entirely.
 Swapping the pack is editing that `.tres` in the SpriteFrames editor.
 

@@ -77,7 +77,7 @@ for class names not yet registered.
   and the message argument is mandatory — write it as why the behaviour matters.
 - **Pull the decision into a static function** so it can be tested without a scene tree.
   This is the strongest convention in the codebase; `Fighter.movement_direction_toward`,
-  `ArenaServer.pick_spawn` and `FighterSprite.facing_for` all exist in that shape for
+  `ArenaServer.pick_spawn` and `Fighter.facing_for` all exist in that shape for
   that reason. It survives the editor-first rule below — an authored node may *call* the
   static, but the decision itself keeps no node reference.
 - **The server simulates; it never renders.** Nothing under `server/` touches a drawing
