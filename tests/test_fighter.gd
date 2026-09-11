@@ -83,8 +83,8 @@ func test_the_fx_layer_sits_at_the_chest_with_the_additive_material() -> void:
 	assert_true(material != null, "without a material the additive glow just tints the robe")
 	assert_eq(
 		material.blend_mode,
-		SpellFX.additive_material().blend_mode,
-		"the authored FX material must stay the additive one SpellFX defines"
+		CanvasItemMaterial.BLEND_MODE_ADD,
+		"the authored FX material must stay additive"
 	)
 
 
