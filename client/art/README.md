@@ -2,22 +2,24 @@
 
 ## Grass-01.png
 
-The arena. A 512×256 top-down tileset on a 16px grid — grass, a dirt-on-grass autotile,
-and a cliff / raised-earth autotile (no buildings or boulders). `grass_tileset.tres`
-slices it and marks the cliff tiles `solid`; `client/scenes/arena_ground.tscn` paints
-three `TileMapLayer`s from it — `Floor` (grass everywhere), `Walls` (a cliff band on the
-four boundary rects, run out past the play edge so no engine-grey shows) and `Cover` (a
-raised cliff block on each of the two tents and two rocks). Both client scenes instance
-that one ground scene.
+The arena. A 512×256 tileset on a 32px grid — grass for the floor, and dirt-bordered
+pieces for the boundary walls and the cover (tents and rocks) sitting on top of it.
+`arena/arena_tileset.tres` slices it and carries a collision polygon on every tile that
+should block; nothing else says a tile is solid — there is no separate "solid" flag and
+no tent/rock enum anywhere in the game.
 
-**Collision did not move.** `server/arena_map.tscn` still owns every `StaticBody2D`, and
-the resolver still raycasts those — a painted cliff blocks nothing on its own. The tiles
-are aligned to the colliders by `client/arena_tiles.gd`, rounded **outward** so a shape
-is always fully under a solid tile (never invisible cover) at the cost of up to one tile
-of overhang, and `tests/test_arena_tiles.gd` fails if a collider is uncovered or a solid
-tile drifts into open play. To reshape the arena: move the collider in
-`server/arena_map.tscn`, repaint `arena_ground.tscn` to match, and that test keeps the
-two honest.
+One authored scene owns the whole arena: `arena/arena_map.tscn`'s `Floor`, `Walls` and
+`Cover` `TileMapLayer`s are painted for looks and collided for physics from that same
+tileset, and `arena/arena_map.gd` only reads it back — `bounds()` is the `Floor` layer's
+extent, and `obstacle_polygons()` lifts the routing shapes straight off `Walls`/`Cover`'s
+own tile data, unioned and split for the pathfinder. `client/scenes/arena_client.tscn`,
+`client/scenes/local_test.tscn` and `server/arena_server.tscn` all instance that one
+scene — there is no separate collision scene kept in step by hand.
+
+To reshape the arena: repaint `arena/arena_map.tscn` in the editor.
+`tests/test_arena_tiles.gd` fails if a painted obstacle carries no collision polygon —
+cover that blocks nothing while still reading as floor — or a solid tile drifts into open
+play.
 
 - **Source:** supplied as `Grass-01.png`; provenance not recorded.
 - **Licence:** ⚠️ **not settled**, same gap as the wizard pack below and the same
