@@ -154,3 +154,64 @@ func test_a_sceneless_fighter_still_stands_up() -> void:
 		"a sceneless fighter must survive a frame without its authored child nodes"
 	)
 	bare.queue_free()
+
+
+# ── corrected_position ──────────────────────────────────────────────────────────────
+#
+# Static, so the reconciliation curve is checked directly rather than by puppeting a
+# scene tree through a fake network round trip.
+
+
+func test_player_controlled_does_not_fight_honest_lag_below_the_dead_zone() -> void:
+	var current := Vector2(100.0, 100.0)
+	var target := current + Vector2(Fighter.CORRECTION_THRESHOLD - 1.0, 0.0)
+	assert_eq(
+		Fighter.corrected_position(current, target, 1.0 / 60.0, true),
+		current,
+		"drift under CORRECTION_THRESHOLD must be left alone, or honest lag gets nagged at"
+	)
+
+
+func test_player_controlled_lerps_rather_than_snaps_past_the_dead_zone() -> void:
+	var current := Vector2(100.0, 100.0)
+	var target := current + Vector2(Fighter.CORRECTION_THRESHOLD + 10.0, 0.0)
+	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0, true)
+	assert_true(
+		corrected != current and corrected != target,
+		"past the dead zone this must ease toward the server, not sit still or snap"
+	)
+
+
+func test_a_lost_stop_packet_alone_does_not_trip_the_teleport_snap() -> void:
+	# The exact worst case `server/arena_server.gd`'s own input timeout already admits
+	# to and tolerates as normal — see MAX_HONEST_DRIFT's doc comment. Before #89 this
+	# sat past TELEPORT_THRESHOLD (120.0) and hard-snapped on every ordinary WAN hiccup.
+	var current := Vector2(100.0, 100.0)
+	var target := current + Vector2(Fighter.MAX_HONEST_DRIFT, 0.0)
+	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0, true)
+	assert_true(
+		corrected != target,
+		"the server's own documented worst-case drift must not read as a teleport"
+	)
+
+
+func test_past_teleport_threshold_snaps_outright() -> void:
+	var current := Vector2(100.0, 100.0)
+	var target := current + Vector2(Fighter.TELEPORT_THRESHOLD + 1.0, 0.0)
+	assert_eq(
+		Fighter.corrected_position(current, target, 1.0 / 60.0, true),
+		target,
+		"a respawn-sized jump must snap outright, not slide the body across the arena"
+	)
+
+
+func test_a_remote_fighter_tracks_even_drift_under_the_dead_zone() -> void:
+	# Nobody predicts a remote fighter, so unlike the local player it has no dead zone —
+	# it is always easing toward the last snapshot, however small the step.
+	var current := Vector2(100.0, 100.0)
+	var target := current + Vector2(Fighter.CORRECTION_THRESHOLD - 1.0, 0.0)
+	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0, false)
+	assert_true(
+		corrected != current,
+		"a remote fighter must smooth toward drift a local player would ignore"
+	)
