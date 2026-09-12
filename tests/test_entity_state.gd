@@ -46,15 +46,15 @@ func test_cast_starts_from_idle() -> void:
 
 func test_cast_completes_after_its_cast_time() -> void:
 	state.try_start_cast(_lightning())
-	state.tick(1.75)
-	assert_eq(completed_spells.size(), 1, "lightning should complete after 1.75s")
+	state.tick(2.5)
+	assert_eq(completed_spells.size(), 1, "lightning should complete after 2.5s")
 	assert_eq(state.current_state, EntityState.State.IDLE, "and return to idle")
 
 
 func test_recast_late_in_a_cast_also_fizzles_and_chains() -> void:
 	# You may abandon a cast at any point, not only in its first moments.
 	state.try_start_cast(_flamestrike())
-	state.tick(2.0)  # deep into flamestrike's 2.5s cast
+	state.tick(3.0)  # deep into flamestrike's 3.5s cast
 	assert_true(state.try_start_cast(_lightning()), "a late recast is accepted")
 	assert_eq(fizzled.size(), 1, "the abandoned spell fizzles")
 	assert_eq(fizzled[0][0].spell_name, "Flamestrike", "flamestrike is what dies")
@@ -65,7 +65,7 @@ func test_abandoning_a_cast_costs_the_same_whenever_you_do_it() -> void:
 	# Bailing out late must not be cheaper than bailing out early, or the right play
 	# would always be to start a long cast and abort it.
 	state.try_start_cast(_flamestrike())
-	state.tick(2.4)
+	state.tick(3.4)
 	state.try_start_cast(_lightning())
 	state.tick(Constants.GLOBAL_CAST_RECOVERY_SECONDS - 0.01)
 	assert_eq(
@@ -119,10 +119,10 @@ func test_chained_spell_casts_for_its_full_time_after_recovery() -> void:
 	state.tick(0.1)
 	state.try_start_cast(_lightning())
 	state.tick(0.25)  # recovery done, lightning starts fresh
-	state.tick(1.74)
+	state.tick(2.49)
 	assert_true(completed_spells.is_empty(), "lightning shouldn't complete early")
 	state.tick(0.01)
-	assert_eq(completed_spells.size(), 1, "lightning completes 1.75s after it started")
+	assert_eq(completed_spells.size(), 1, "lightning completes 2.5s after it started")
 
 
 func test_casting_during_recovery_is_denied() -> void:
@@ -148,7 +148,7 @@ func test_spamming_late_in_long_casts_still_never_lands() -> void:
 	# extreme: pressing just before each cast would have completed.
 	state.try_start_cast(_flamestrike())
 	for i in 4:
-		state.tick(2.4)
+		state.tick(3.4)
 		state.try_start_cast(_flamestrike())
 		state.tick(Constants.GLOBAL_CAST_RECOVERY_SECONDS)
 	assert_true(completed_spells.is_empty(), "aborting at the last moment lands nothing")

@@ -81,7 +81,7 @@ func test_a_refused_request_does_not_steal_the_aim() -> void:
 	await get_tree().physics_frame
 	assert_false(server.request_cast(2, ARROW, 4), "there is no line to 4")
 
-	await _run(2.2)
+	await _run(3.3)
 	assert_true(_health(3) < Constants.PLAYER_MAX_HEALTH, "the flamestrike still hit 3")
 	assert_almost_eq(_health(4), Constants.PLAYER_MAX_HEALTH, "and never touched 4")
 
@@ -103,7 +103,7 @@ func test_a_target_dying_mid_cast_leaves_the_spell_with_nowhere_to_go() -> void:
 	await _run(0.5)
 	server.combatant_of(3).take_damage(Constants.PLAYER_MAX_HEALTH)
 
-	await _run(2.2)
+	await _run(3.3)
 	assert_almost_eq(
 		_health(4), Constants.PLAYER_MAX_HEALTH, "it must not wander onto someone else"
 	)

@@ -228,7 +228,7 @@ func test_a_target_who_leaves_mid_cast_is_simply_not_there() -> void:
 	server.request_cast(2, FLAMESTRIKE, 3)
 	await _run(0.5)
 	server.remove_player(3)
-	await _run(2.2)
+	await _run(3.3)
 
 	assert_eq(resolutions.size(), 0, "a spell aimed at nobody announces nothing")
 	assert_eq(
