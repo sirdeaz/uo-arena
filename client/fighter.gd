@@ -46,9 +46,21 @@ const RUNE_COUNT: int = 3
 ## adds more, so correcting under this would mean nagging at honest lag.
 const CORRECTION_THRESHOLD: float = 28.0
 
+## Worst-case honest drift the server itself already tolerates: `submit_input` is
+## unreliable, so the packet that says "I let go" can go missing, and
+## `server/arena_server.gd`'s `_step_movement` only gives up and zeroes the input after
+## `Constants.INPUT_TIMEOUT_SECONDS` — up to that long spent still moving on a stale
+## direction. `TELEPORT_THRESHOLD` has to clear this with real margin, or the server's
+## own documented, expected packet loss trips a hard snap on a normal connection (#89).
+const MAX_HONEST_DRIFT: float = Constants.PLAYER_MOVE_SPEED * Constants.INPUT_TIMEOUT_SECONDS
+
 ## Past this we are not correcting, we are teleporting — a respawn, or a desync worth
 ## admitting to. Snap, rather than sliding the body across the arena.
-const TELEPORT_THRESHOLD: float = 120.0
+##
+## Twice `MAX_HONEST_DRIFT`: a respawn moves a player clear across the arena, hundreds
+## of pixels, so there is plenty of room above the input timeout's own worst case
+## before this stops meaning "give up" and starts meaning "you were only ever lagging."
+const TELEPORT_THRESHOLD: float = MAX_HONEST_DRIFT * 2.0
 
 const CORRECTION_RATE: float = 8.0
 const REMOTE_RATE: float = 18.0
@@ -213,22 +225,32 @@ func _physics_process(delta: float) -> void:
 ## overshoot that costs is roughly the size of the correction threshold — which is why
 ## the correction is a lerp rather than a snap.
 func _apply_server_correction(delta: float) -> void:
-	var error := global_position.distance_to(server_position)
+	global_position = corrected_position(
+		global_position, server_position, delta, player_controlled
+	)
+	combatant.position = global_position
+
+
+## The reconciliation decision itself, pulled out static so the curve — where the dead
+## zone ends, where a lerp turns into a snap — can be checked without a scene tree.
+##
+## `player_controlled` gets the dead zone below `CORRECTION_THRESHOLD` so honest, bounded
+## lag isn't fought frame to frame; a remote fighter has nothing of its own predicting it,
+## so it tracks every drift, however small. Both lerp at their own rate up to
+## `TELEPORT_THRESHOLD`, past which this stops being a correction — see that constant's
+## own doc comment for why the line sits where it does.
+static func corrected_position(
+	current: Vector2, target: Vector2, delta: float, player_controlled: bool
+) -> Vector2:
+	var error := current.distance_to(target)
 
 	if error > TELEPORT_THRESHOLD:
-		global_position = server_position
-	elif not player_controlled:
-		# Nobody is predicting this one, so track tightly. The smoothing is here only to
-		# hide the step between snapshots.
-		global_position = global_position.lerp(
-			server_position, 1.0 - exp(-delta * REMOTE_RATE)
-		)
-	elif error > CORRECTION_THRESHOLD:
-		global_position = global_position.lerp(
-			server_position, 1.0 - exp(-delta * CORRECTION_RATE)
-		)
-
-	combatant.position = global_position
+		return target
+	if not player_controlled:
+		return current.lerp(target, 1.0 - exp(-delta * REMOTE_RATE))
+	if error > CORRECTION_THRESHOLD:
+		return current.lerp(target, 1.0 - exp(-delta * CORRECTION_RATE))
+	return current
 
 
 ## Gives this fighter a route-finder to steer with. Injected rather than looked up, the
