@@ -22,9 +22,9 @@ cover that blocks nothing while still reading as floor — or a solid tile drift
 play.
 
 - **Source:** supplied as `Grass-01.png`; provenance not recorded.
-- **Licence:** ⚠️ **not settled**, same gap as the wizard pack below and the same
-  precedent (`client/fonts/OFL.txt`). Whatever this tileset ships under belongs written
-  down next to it before the browser build goes anywhere a player downloads it.
+- **Licence:** ⚠️ **not settled**, same precedent as `client/fonts/OFL.txt`. Whatever
+  this tileset ships under belongs written down next to it before the browser build
+  goes anywhere a player downloads it.
 - **Weight:** 21 KB on disk, ~10 KB imported, lossless (`vram_texture_compression` still
   off — #20 still wants a real budget now that arena art exists).
 - **Not autotiled yet.** The `Cover`/`Walls` blocks are a hand-picked nine-slice, not a
@@ -32,60 +32,68 @@ play.
   the editor is the intended next pass — the whole point of it being a `.tres` and a
   `.tscn` rather than built in code.
 
-## wizard.png
+## mage_idle.png / mage_walk_down.png / mage_walk_right.png / mage_walk_up.png
 
-The fighters. One strip of 46 frames, 79×65 each — 3634×65 in total. `wizard_frames.tres`
-(a `SpriteFrames` resource) slices it into twelve animations — a six-frame walk and a
-four-frame cast for each of down, up, right and left, plus four idle sets that replay the
-walk frames slowly — and `client/scenes/fighter.tscn` assigns it to the `Character`
-`AnimatedSprite2D` on every fighter. Nothing in code sets a frame up: `Fighter` names an
-animation (`Fighter.animation_name`) and calls `play()` on it as the fighter moves
-or casts. The six-frame channel set (frames 40–45) is left out of the resource entirely.
-Swapping the pack is editing that `.tres` in the SpriteFrames editor.
+The fighters. Four separate 560×70 strips, eight 70×70 frames each — one per animation,
+not one shared atlas. `mage_frames.tres` (a `SpriteFrames` resource) names them `idle`,
+`walk_down`, `walk_right` and `walk_up`, and `client/scenes/fighter.tscn` assigns it to
+the `Character` `AnimatedSprite2D` on every fighter. Nothing in code sets a frame up:
+`Fighter` names an animation (`Fighter.animation_name`) and calls `play()` on it as the
+fighter moves. Swapping the pack is editing that `.tres` in the SpriteFrames editor.
 
 It carries **posture and heading, and nothing else** — which way you are pointing, whether
-you are walking, whether a spell is coming. Health, status, whose body this is and which
-spell it is stay `_draw()` calls in palette colours, because every fighter in the arena
-wears this same robe and one robe cannot be told from another at a glance.
-`docs/art-direction.md` states that rule; `tests/test_fighter_sprite.gd` checks the
-heading/posture decision and `tests/test_fighter_frames.gd` re-measures the pack.
+you are walking. Health, status, whose body this is and which spell it is stay `_draw()`
+calls in palette colours, because every fighter in the arena wears this same robe and one
+robe cannot be told from another at a glance. `docs/art-direction.md` states that rule;
+`tests/test_fighter_sprite.gd` checks the heading/posture decision and
+`tests/test_fighter_frames.gd` re-measures the pack.
 
-- **Source:** a wizard character pack supplied for #26, as a single pre-packed strip.
-- **Licence:** ⚠️ **not yet settled.** The repository is MIT and `client/fonts/OFL.txt` is
-  the precedent: whatever this pack ships under belongs next to it, named, before this
-  goes anywhere a player can download it. Nothing here is UO-derived, so it is a
-  paperwork gap rather than a rights problem — but it is still a gap.
-- **Weight:** 18 KB on disk, 9 KB imported, which is what actually ships — lighter than
-  the single-heading atlas it replaced, which cost 33 KB for a quarter of the animation.
-  For scale, the subset display font is 15 KB. `vram_texture_compression` stays off, so
-  this is a lossless PNG rather than a compressed texture.
+- **Source:** self-authored, drawn in Aseprite for this project. Not sourced from an
+  asset pack or extracted game files, despite the `uo_`-prefixed working names it
+  arrived under — confirmed and renamed before landing here.
+- **Licence:** settled. Original art, owned the same way the rest of this repository's
+  code is — no `client/fonts/OFL.txt`-style third-party note needed, unlike the tileset
+  above.
+- **Weight:** four textures rather than one, so compare against the pack they replaced
+  by total: was 18 KB / 9 KB imported for one 3634×65 strip; is a few separate small
+  strips instead. `vram_texture_compression` stays off, so these are lossless PNGs.
 
-### Shipped exactly as supplied
+### Two headings this pack does not draw
 
-There is **no packing step**. The pack arrives as a registered atlas on a uniform 79×65
-grid, so what ships is the artwork that was handed over, byte for byte. Each frame in
-`wizard_frames.tres` is an `AtlasTexture` over a single cell — walk and cast alternate by
-heading on the sheet rather than sitting in blocks, so the twelve animations pick out
-non-contiguous runs.
+- **No dedicated left-facing walk.** `Fighter.animation_name` hands back `walk_right`'s
+  own name for `LEFT`, and `Fighter.should_flip_h` mirrors it via
+  `AnimatedSprite2D.flip_h`. This is safe *because* `Character.centered = true` in
+  `fighter.tscn` with no asymmetric offset — a centred sprite mirrors around its own
+  local origin, so flipping it can't make a fighter hop sideways the way the old pack's
+  uncorrected left set once did. `tests/test_fighter_sprite.gd` checks the mirroring
+  decision; `tests/test_fighter_frames.gd`'s registration check compares the three real
+  walk headings against each other with a wider tolerance than the old pack needed —
+  this is three independently drawn poses, not one strip sliced four ways, so some
+  natural stance variance between headings is the art, not a slicing bug.
+- **No cast set.** `Fighter.Anim.CAST` and the scrub-to-cast-progress logic in
+  `_update_character_animation` are still there, unremoved — they were kept dormant on
+  purpose rather than deleted, gated on `SpriteFrames.has_animation`, so a future pack
+  that adds `cast_down`/`cast_up`/`cast_right`/`cast_left` back reactivates them with no
+  further code change. Until then, casting causes no visible change to the body
+  animation — the mantra overhead and the cast aura are what say a spell is coming.
 
-### Two things measured rather than assumed
+Replacing the pack means rebuilding `mage_frames.tres` against the new sheets and
+re-measuring `Character.offset` and `FighterChrome.head_top`/`chest` against the new
+art's own proportions. `tests/test_fighter_frames.gd` reads whatever the resource points
+at, so a swap that gets the layout wrong fails rather than shipping a fighter who hops or
+vanishes mid-walk.
 
-- **The left-facing walk sits about 3.6 px left in its cells.** Everything else registers
-  within a pixel. Drawn from one `AnimatedSprite2D.offset` a fighter would hop sideways
-  every time it turned left, so the left frames' `AtlasTexture`s carry a `margin` that
-  pulls them back into registration. `test_every_heading_stands_in_the_same_place`
-  re-measures the committed PNG rather than trusting it.
-- **Frames 40–45 are a staff-raised channel** with its own yellow-and-blue sparkle burst,
-  and are deliberately unused. The game already announces a cast with the mantra overhead
-  and an aura in the colour of the spell being cast; this would say the same thing again,
-  in the wrong colour. No animation in `wizard_frames.tres` references them, and
-  `test_the_channel_frames_are_left_alone` pins that as a decision.
+## shadow.png
 
-A cast set is not played on its own clock: `Fighter._update_character_animation` scrubs it
-to real cast progress, so a one-second spell and a four-second one show a different pose at
-the same moment — the read on how close the spell is to landing.
+The ground shadow every fighter stands in — a small decal, `Sprite2D`-authored as the
+first child of `Fighter` in `client/scenes/fighter.tscn`, `z_index = -1` so it still
+paints under the identity rim `Fighter._draw_footing()` draws in code (see
+`docs/art-direction.md` for why that rim has to stay procedural while the shadow
+underneath it didn't).
 
-Replacing the pack means rebuilding `wizard_frames.tres` against the new sheet and
-re-measuring. `tests/test_fighter_frames.gd` reads whatever the resource points at, so a
-swap that gets the layout wrong fails rather than shipping a fighter who hops, or vanishes
-mid-spell.
+- **Source / Licence:** self-authored alongside the mage pack above — same settled
+  status.
+- Replaced a `draw_circle` fill that carried no meaning of its own
+  (`client/palette.gd`'s `BODY_RING_ALPHA` doc comment called it "the weaker of the two
+  on purpose") — the one part of `Fighter`'s look that wasn't yet an authored asset like
+  everything else on the node.

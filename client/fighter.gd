@@ -74,7 +74,7 @@ const REMOTE_RATE: float = 18.0
 ## `client/art/fighter_chrome.tres`; `_ready` loads that default when a bare
 ## `Fighter.new()` leaves this null.
 ##
-## The character's own animation set lives in `client/art/wizard_frames.tres`, a
+## The character's own animation set lives in `client/art/mage_frames.tres`, a
 ## `SpriteFrames` assigned to the `Character` `AnimatedSprite2D` in the scene —
 ## `_update_character_animation` only names an animation and calls `play()` on it.
 @export var chrome: FighterChrome
@@ -99,7 +99,7 @@ var _steering: PathSteering = null
 var combatant: Combatant
 
 ## The character on screen: an `AnimatedSprite2D` whose `SpriteFrames` and per-set timing
-## are authored in `client/art/wizard_frames.tres`. `_update_character_animation` picks an
+## are authored in `client/art/mage_frames.tres`. `_update_character_animation` picks an
 ## animation name and plays it; nothing here sets a frame up. Null only for a bare
 ## `Fighter.new()` with no scene, which still runs its logic and draws its footing.
 @onready var _character: AnimatedSprite2D = get_node_or_null(^"Character")
@@ -334,24 +334,28 @@ static func waypoint_direction_toward(from: Vector2, target: Vector2) -> Vector2
 # rather than scattered by kind, so a reader can still hold "everything about picking an
 # animation" in one place.
 #
-# The frames themselves — regions, per-heading registration, loop flags, playback speed
-# — live in `client/art/wizard_frames.tres`, a `SpriteFrames` resource authored in the
-# editor and assigned to the `Character` `AnimatedSprite2D` in `client/scenes/fighter.tscn`.
-# Nothing here sets a frame up; `_update_character_animation` only names one and calls
-# `play()` on it.
+# The frames themselves — regions, loop flags, playback speed — live in
+# `client/art/mage_frames.tres`, a `SpriteFrames` resource authored in the editor and
+# assigned to the `Character` `AnimatedSprite2D` in `client/scenes/fighter.tscn`. Nothing
+# here sets a frame up; `_update_character_animation` only names one and calls `play()`
+# on it.
 #
 # What this may say: posture and heading, and nothing else. Health, status, cast
 # progress, which spell, whose body this is: every one of those stays a `_draw()` call in
 # a palette colour, because ten fighters wear this same robe and one hooded robe cannot
 # be told from another at a glance. See `docs/art-direction.md`.
 
-## Which way a fighter is pointing. UO plays on a diagonal grid and this pack has four
-## headings, so movement resolves to the nearest of them.
+## Which way a fighter is pointing. UO plays on a diagonal grid, so movement resolves to
+## the nearest of four headings — but the pack (#93) only draws three of them plus a
+## non-directional idle; `animation_name`/`should_flip_h` are what make LEFT a mirror of
+## RIGHT rather than its own set.
 enum Facing { DOWN, UP, RIGHT, LEFT }
 
-## Posture. Idle and walk share one set of frames — the pack draws no separate standing
-## pose — and are told apart by how fast that set is played, which the `SpriteFrames`
-## resource does with two animations over the same frames.
+## Posture. `CAST` has carried no art of its own since #93 replaced the pack — see
+## `animation_name` and `_update_character_animation`, which fall back to `IDLE`/`WALK`
+## rather than erroring while that's true, and pick it back up automatically the moment
+## a `cast_*` animation exists again. Kept as a real state rather than deleted: casting
+## still wins the *decision* in `animation_for`, it just has nothing to show for it yet.
 enum Anim { IDLE, WALK, CAST }
 
 ## Speed, in px/s, above which a fighter is walking rather than standing. Well under
@@ -412,17 +416,21 @@ static func animation_for(state: EntityState.State, speed: float) -> Anim:
 	return Anim.IDLE
 
 
-## The name of the `SpriteFrames` animation for a posture and a heading, e.g. `walk_left`.
-## Passed straight to `AnimatedSprite2D.play` by `_update_character_animation`, and
+## The name of the `SpriteFrames` animation for a posture and a heading. Passed straight
+## to `AnimatedSprite2D.play` by `_update_character_animation`, and
 ## `tests/test_fighter_frames.gd` checks the pack actually carries every name this can
 ## return.
+##
+## `IDLE` is one non-directional animation — the pack draws no per-heading standing pose.
+## `WALK` has no dedicated `LEFT` set: it returns the same name as `RIGHT`, and
+## `should_flip_h` is what turns that into a mirrored walk rather than a fighter who
+## faces left but visibly walks right. `CAST` still returns a distinct name per heading,
+## unchanged since before #93, even though the current pack defines none of them — see
+## `Anim.CAST`'s doc comment.
 static func animation_name(anim: Anim, facing: Facing) -> StringName:
-	var posture := "idle"
-	match anim:
-		Anim.WALK:
-			posture = "walk"
-		Anim.CAST:
-			posture = "cast"
+	if anim == Anim.IDLE:
+		return &"idle"
+
 	var heading := "down"
 	match facing:
 		Facing.UP:
@@ -430,8 +438,22 @@ static func animation_name(anim: Anim, facing: Facing) -> StringName:
 		Facing.RIGHT:
 			heading = "right"
 		Facing.LEFT:
-			heading = "left"
+			# No walk_left in the pack (#93) — animation_name hands back walk_right's own
+			# name, and should_flip_h is what mirrors it.
+			heading = "left" if anim == Anim.CAST else "right"
+	var posture := "walk" if anim == Anim.WALK else "cast"
 	return StringName("%s_%s" % [posture, heading])
+
+
+## Whether the `Character` sprite should be drawn mirrored for this heading. The pack has
+## no dedicated left-facing walk (see `animation_name`) — this is what turns `walk_right`
+## into a walk_left instead.
+##
+## Safe only because `Character.centered = true` in `fighter.tscn`, with no asymmetric
+## offset: a centred sprite mirrors around its own local origin, so flipping it can never
+## make a fighter hop sideways the way the old pack's uncorrected left set once did.
+static func should_flip_h(facing: Facing) -> bool:
+	return facing == Facing.LEFT
 
 
 ## The steering this player is asking for, before any rule is applied to it. Public
@@ -461,13 +483,16 @@ func _draw() -> void:
 
 ## Plays the animation for this frame's heading and posture on the `Character`
 ## `AnimatedSprite2D`. The frames, their speed and their loop flag live in
-## `client/art/wizard_frames.tres`; this only names one and calls `play()` when the
+## `client/art/mage_frames.tres`; this only names one and calls `play()` when the
 ## posture or heading changes.
 ##
 ## A cast is the exception: rather than run on the animation's own clock, its frame is
 ## scrubbed to real cast progress, so a one-second spell and a four-second one show a
 ## different pose at the same moment — the read on how close the spell is to landing,
-## the same choice `_draw_cast_animation` makes for the aura.
+## the same choice `_draw_cast_animation` makes for the aura. Since #93 the current pack
+## has no `cast_*` animation at all, so that only happens when `has_animation` says one
+## exists — until then casting falls back to whatever `IDLE`/`WALK` would have shown, so
+## it causes no visible change rather than an error.
 func _update_character_animation() -> void:
 	if _character == null or _character.sprite_frames == null:
 		return
@@ -475,6 +500,12 @@ func _update_character_animation() -> void:
 	var state := combatant.entity_state
 	var posture := animation_for(state.current_state, _travel_speed)
 	var wanted := animation_name(posture, _facing)
+
+	if posture == Anim.CAST and not _character.sprite_frames.has_animation(wanted):
+		posture = Anim.WALK if _travel_speed > WALK_SPEED_THRESHOLD else Anim.IDLE
+		wanted = animation_name(posture, _facing)
+
+	_character.flip_h = should_flip_h(_facing)
 
 	var count := _character.sprite_frames.get_frame_count(wanted)
 	if count <= 0:
@@ -495,16 +526,28 @@ func _update_character_animation() -> void:
 		_character.play(wanted)
 
 
-## The mark on the floor the character stands on: the collision circle itself, filled
-## as a shadow and rimmed in this fighter's own colour.
+## The identity ring at the collision circle, in this fighter's own colour.
 ##
-## The rim is not decoration, it is the identity read, and it is why the circle this
-## replaced could go. Ten fighters wear one hooded robe, so the art cannot say which of
-## them you are looking at; blue-is-you has to survive somewhere, and drawing it at the
-## collision radius keeps `ArenaView`'s bargain besides — the shape you read is still
-## exactly the shape that blocks.
+## The rim is not decoration, it is the identity read. Ten fighters wear one hooded
+## robe, so the art cannot say which of them you are looking at; blue-is-you has to
+## survive somewhere, and drawing it at the collision radius keeps `ArenaView`'s
+## bargain besides — the shape you read is still exactly the shape that blocks. See
+## `docs/art-direction.md`.
+##
+## The ground shadow this used to draw alongside the rim is the `Shadow` `Sprite2D`
+## authored in `client/scenes/fighter.tscn` now (#93) — it carried no meaning of its
+## own (`palette.gd`'s own comment on `BODY_SHADOW_ALPHA` called it "the weaker of the
+## two on purpose"), so unlike the rim it was free to become an asset.
+##
+## `Shadow` sits at `z_index = -1` so it still paints under this rim despite being a
+## child node (a parent's own `_draw()` otherwise always precedes its children's).
+## That puts it in the same z bucket as `arena/arena_map.tscn`'s `Walls`/`Cover`
+## layers (also -1) — it still renders under cover today only because `Arena` is
+## added to the tree before `Stage`/spawned fighters in both
+## `client/scenes/arena_client.tscn` and `client/scenes/local_test.tscn`, so tree
+## order breaks the tie. A future reorder of `Arena` vs `Stage` could regress that
+## silently — nothing currently tests it.
 func _draw_footing() -> void:
-	draw_circle(Vector2.ZERO, RADIUS, Color(Palette.OUTLINE, Palette.BODY_SHADOW_ALPHA))
 	draw_arc(
 		Vector2.ZERO, RADIUS, 0.0, TAU, 32,
 		Color(body_color, Palette.BODY_RING_ALPHA), chrome.footing_rim_width, true

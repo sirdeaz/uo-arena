@@ -1,14 +1,16 @@
 extends TestCase
 
 ## Which animation the fighter's sprite should be playing — heading and posture — and
-## nothing about the frames themselves. Those live in `client/art/wizard_frames.tres` and
+## nothing about the frames themselves. Those live in `client/art/mage_frames.tres` and
 ## are checked by `tests/test_fighter_frames.gd`; this file only exercises the pure
 ## decisions on `Fighter`, the way the codebase tests every decision it pulls out
 ## into a static function.
 ##
-## **Heading.** The pack draws four of them. Getting it backwards points every mage the
-## wrong way, and the arena is symmetric enough that a mirrored heading looks plausible
-## until you watch someone walk into a tent they are facing away from.
+## **Heading.** Four exist, but the pack (#93) draws only three walk poses plus a
+## non-directional idle — `LEFT` mirrors `RIGHT` (`should_flip_h`) rather than getting
+## its own set. Getting a heading backwards still points every mage the wrong way, and
+## the arena is symmetric enough that a mirrored heading looks plausible until you watch
+## someone walk into a tent they are facing away from.
 ##
 ## **Posture.** Idle, walk, cast. Casting wins over walking (you can do both at once, and
 ## the spell is the read); a snapshot nudge is not a walk.
@@ -175,30 +177,59 @@ func test_recovery_is_not_a_cast() -> void:
 
 func test_the_animation_name_is_posture_then_heading() -> void:
 	assert_eq(
-		Fighter.animation_name(WALK, LEFT), &"walk_left",
-		"the name is <posture>_<heading>, matching the sets in wizard_frames.tres"
+		Fighter.animation_name(WALK, RIGHT), &"walk_right",
+		"the name is <posture>_<heading>, matching the sets in mage_frames.tres"
 	)
 	assert_eq(
 		Fighter.animation_name(CAST, UP), &"cast_up",
-		"a cast set is named the same way"
+		"a cast set is named the same way, unchanged since before #93"
 	)
+
+
+func test_walking_left_borrows_walk_rights_name() -> void:
+	# No walk_left in the pack (#93) — should_flip_h is what turns this into a mirrored
+	# walk rather than a fighter who faces left but visibly walks right.
+	assert_eq(
+		Fighter.animation_name(WALK, LEFT), Fighter.animation_name(WALK, RIGHT),
+		"left has no walk set of its own — it plays right's, mirrored"
+	)
+
+
+func test_only_left_is_drawn_mirrored() -> void:
+	assert_true(Fighter.should_flip_h(LEFT), "left has no art of its own to mirror right into")
+	for facing in [DOWN, UP, RIGHT]:
+		assert_false(
+			Fighter.should_flip_h(facing),
+			"only left borrows another heading's animation — the rest play their own art"
+		)
 
 
 func test_idle_and_walk_are_told_apart_by_name() -> void:
-	# The pack draws no standing pose — idle and walk share frames — but they are two
-	# animations at different speeds, so the name has to distinguish them.
+	# Idle and walk are separate art now (#93), not two speeds over shared frames — but
+	# the name still has to distinguish them, the same contract as before.
 	assert_true(
 		Fighter.animation_name(IDLE, DOWN) != Fighter.animation_name(WALK, DOWN),
-		"idle and walk must resolve to different animations so idle can play slower"
+		"idle and walk must resolve to different animations"
 	)
 
 
-func test_every_posture_and_heading_has_a_name() -> void:
+func test_idle_does_not_care_which_way_you_are_facing() -> void:
+	# The pack draws one non-directional idle (#93) — every heading names the same
+	# animation, unlike walk.
+	for facing in [DOWN, UP, LEFT, RIGHT]:
+		assert_eq(
+			Fighter.animation_name(IDLE, facing), &"idle",
+			"idle has no per-heading set to pick between"
+		)
+
+
+func test_every_animation_the_client_can_name_totals_eight() -> void:
 	var seen := {}
 	for anim in [IDLE, WALK, CAST]:
 		for facing in [DOWN, UP, LEFT, RIGHT]:
 			seen[Fighter.animation_name(anim, facing)] = true
 	assert_eq(
-		seen.size(), 12,
-		"three postures across four headings must name twelve distinct animations"
+		seen.size(), 8,
+		"one idle, three walk headings (left borrows right), and four dormant cast " +
+		"headings (#93) name eight distinct animations"
 	)

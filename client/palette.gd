@@ -59,8 +59,6 @@ const UI_TEXT_DIM := Color(UI_TEXT, 0.62)
 const UI_TEXT_ALERT := Color("#d89b7a")
 
 ## Near-black behind overhead text and bars, so they survive any floor under them.
-## Also the shadow a fighter stands in — the same job, one layer down: it is what sets
-## the character off the floor rather than a colour of its own.
 const OUTLINE := Color("#0d1017")
 
 ## The empty part of a health bar. Deliberately the arena's own slate — an unfilled bar
@@ -86,14 +84,14 @@ const GRID_AXIS_ALPHA: float = 0.34
 
 const PLAYER := Color("#6ec6ff")
 
-## The footing under a fighter: the collision circle, filled as a shadow in `OUTLINE`
-## and rimmed in that fighter's own colour.
+## The identity rim at a fighter's collision circle, in that fighter's own colour.
 ##
 ## Every fighter wears the same hooded robe, so this rim is where "which one is that"
 ## now lives — the first read of a fight, and the one the sprite cannot make. The
-## shadow is the weaker of the two on purpose: it grounds the character, the rim
-## identifies them.
-const BODY_SHADOW_ALPHA: float = 0.4
+## ground shadow that used to be drawn alongside it (`OUTLINE` at a low alpha, filled
+## under the rim) carried no meaning of its own, so it became the `Shadow` `Sprite2D`
+## authored in `client/scenes/fighter.tscn` instead (#93) — unlike this rim, it was
+## free to become an asset.
 const BODY_RING_ALPHA: float = 0.85
 
 ## The practice dummy, and later the opponent. Rose rather than red: red has one job

@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="PackedScene" path="res://common/body_base.tscn" id="1_base"]
 [ext_resource type="Script" path="res://client/fighter.gd" id="2_fighter"]
-[ext_resource type="SpriteFrames" path="res://client/art/wizard_frames.tres" id="3_frames"]
+[ext_resource type="SpriteFrames" path="res://client/art/mage_frames.tres" id="3_frames"]
 [ext_resource type="Resource" path="res://client/art/fighter_chrome.tres" id="4_chrome"]
+[ext_resource type="Texture2D" uid="uid://byck52255s011" path="res://client/art/shadow.png" id="5_shadow"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_fx"]
 blend_mode = 1
@@ -12,15 +13,18 @@ blend_mode = 1
 script = ExtResource("2_fighter")
 chrome = ExtResource("4_chrome")
 
+[node name="Shadow" type="Sprite2D" parent="."]
+z_index = -1
+texture = ExtResource("5_shadow")
+
 [node name="Character" type="AnimatedSprite2D" parent="."]
 sprite_frames = ExtResource("3_frames")
-animation = &"idle_down"
-autoplay = "idle_down"
-centered = false
-offset = Vector2(-31, -49)
+animation = &"idle"
+autoplay = "idle"
+offset = Vector2(0, -34)
 
 [node name="FX" type="Node2D" parent="."]
-position = Vector2(0, -26)
+position = Vector2(0, -32)
 material = SubResource("CanvasItemMaterial_fx")
 
 [node name="UI" type="Node2D" parent="."]
