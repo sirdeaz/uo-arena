@@ -32,6 +32,39 @@ play.
   the editor is the intended next pass — the whole point of it being a `.tres` and a
   `.tscn` rather than built in code.
 
+## tree_pine.png / tree_broadleaf.png / bush.png
+
+Three more `Cover` candidates for #110: two trees meant to block the way a tent or rock
+already does, and a bush meant to block nothing. Each is its own `TileSetAtlasSource` in
+`arena/arena_tileset.tres` (`sources/1`–`sources/3`) rather than a cell sliced from
+`Grass-01.png` — none of the three share that sheet's 32px grid or each other's
+dimensions, and both trees are taller than one tile on purpose, so their canopy can
+overhang the cell they're planted in instead of the collision box implying a tree that
+wide.
+
+- `tree_pine.png` (64×70) and `tree_broadleaf.png` (48×80) each carry a collision
+  polygon sized to their trunk, not their full canopy — traced from where the sprite's
+  own opaque pixels actually narrow to a base, not eyeballed. Neither tile has been
+  painted into `arena/arena_map.tscn` yet: they're staged as ready-to-place tiles in the
+  tileset, same shape as any existing `Cover` tile, but placing them is still an editor
+  pass (#110).
+- `bush.png` is 40×32 and carries no collision polygon at all — walkable, matching every
+  other floor tile.
+- **Both trees are painted centred on their tile**, same as every existing tile in this
+  tileset. Since each is taller than the 32px grid, that means roughly half the canopy
+  reads above the cell and the trunk's own base sits a little below the cell's floor
+  rather than sitting on it, until the tile's `texture_origin` is nudged upward in the
+  TileSet editor's Paint tab — how far is a by-eye call, not a computed one, but
+  `tree_pine.png` wants roughly 19px and `tree_broadleaf.png` roughly 24px as a starting
+  point. **If `texture_origin` moves, shift the tile's collision polygon points by the
+  same Y amount** — the two are independent properties in Godot's `TileData` and don't
+  move together automatically; leaving the polygon behind plants the collision in mid-air
+  instead of under the visible trunk.
+- **Source:** supplied by the user; provenance not yet recorded.
+- **Licence:** ⚠️ **not settled** — same open state as `Grass-01.png` above, not a
+  finished answer. Settle before either ships anywhere a player downloads a build.
+- **Weight:** 2.5 KB / 2 KB / 0.6 KB on disk respectively, lossless, uncompressed.
+
 ## mage_idle.png / mage_walk_down.png / mage_walk_right.png / mage_walk_up.png
 
 The fighters. Four separate 560×70 strips, eight 70×70 frames each — one per animation,
