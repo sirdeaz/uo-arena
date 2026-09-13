@@ -53,9 +53,9 @@ class_name FighterChrome
 ## Top of the character's head in body coordinates (negative y is up). The overhead reads
 ## hang off this rather than off the collision radius — the sprite is taller than the
 ## circle, so a bar placed above the circle would cross the mage's chest. Measured off
-## `client/art/wizard.png`; see `client/art/README.md`.
-@export var head_top: float = -49.0
+## `client/art/mage_idle.png`; see `client/art/README.md`.
+@export var head_top: float = -61.0
 ## Roughly the character's middle, measured up from the feet. Body effects — the cast
 ## aura, the release burst — gather here rather than at the ankles, where they would read
 ## as a puddle. The `FX` layer in `fighter.tscn` is authored to this same point.
-@export var chest: Vector2 = Vector2(0.0, -26.0)
+@export var chest: Vector2 = Vector2(0.0, -32.0)

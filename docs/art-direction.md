@@ -40,25 +40,28 @@ radius, still exactly the shape the raycast hits.
 Concretely, what the sprite is **not** allowed to do, and what holds each one:
 
 - **Say who someone is.** `Palette.BODY_RING_ALPHA`, drawn in `body_color`, and
-  `tests/test_palette.gd` still pins ten separable opponents.
-- **Say what spell is coming.** The cast set is four postures for every spell in the
-  book; the aura, the bolt and the mantra carry which one, in that spell's own colour.
-- **Say a spell landed.** The pack's channel set — frames 40–45, a staff raised into a
-  fixed yellow-and-blue sparkle — is deliberately left unused for this reason. It would
-  announce a cast the mantra and the aura already announce, and in a colour that is never
-  the spell's.
+  `tests/test_palette.gd` still pins ten separable opponents. The pack replaced in #93
+  swapped its ground shadow for an authored asset too, but stopped there — the rim is
+  still a `_draw()` call, in code, because a shared static image cannot carry ten
+  colours.
+- **Say what spell is coming.** The aura, the bolt and the mantra carry which spell, in
+  that spell's own colour — a cast pose on the sprite itself would say the same thing
+  again. The current pack (#93) has no cast set at all to make this mistake with; the
+  code that would play one if it existed stays dormant rather than deleted, waiting for
+  art that does.
 - **Drift from the collision shape.** The footprint is drawn at `Constants.PLAYER_RADIUS`,
   which is the circle the server collides and the resolver raycasts.
 
 ## Where the line still needs drawing
 
-- **A byte budget.** 9 KB imported, against a browser build that is the primary
-  distribution channel. Four headings came in *lighter* than the one heading before them,
-  which is luck rather than discipline: there is still no number that a future asset has
-  to argue against (#20).
-- **Provenance.** Anything sourced outside the repo needs its licence recorded next to it,
-  the way `client/fonts/OFL.txt` is. `client/art/README.md` currently records that this
-  pack's licence is *unsettled*, which is the honest state, not the finished one.
+- **A byte budget.** Still no committed number a future asset has to argue against
+  (#20) — #93's pack changed the shape of the weight question (four separate textures
+  instead of one shared atlas) without settling it.
+- **Provenance.** Anything sourced outside the repo needs its licence recorded next to
+  it, the way `client/fonts/OFL.txt` is. The fighter pack itself cleared this in #93 —
+  self-authored, recorded as settled in `client/art/README.md` — but `Grass-01.png`
+  still carries the *unsettled* note this section originally pointed at, which is the
+  honest state, not the finished one.
 - **The world.** Floor, walls and cover are authored `TileMapLayer`s in
   `arena/arena_map.tscn` now — `ArenaView` and its "no art assets" invariant were
   retired in the arena merge (#51–#55), which is what #35 asked for.

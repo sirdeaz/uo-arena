@@ -1,14 +1,16 @@
 extends TestCase
 
 ## Which animation the fighter's sprite should be playing — heading and posture — and
-## nothing about the frames themselves. Those live in `client/art/wizard_frames.tres` and
+## nothing about the frames themselves. Those live in `client/art/mage_frames.tres` and
 ## are checked by `tests/test_fighter_frames.gd`; this file only exercises the pure
 ## decisions on `Fighter`, the way the codebase tests every decision it pulls out
 ## into a static function.
 ##
-## **Heading.** The pack draws four of them. Getting it backwards points every mage the
-## wrong way, and the arena is symmetric enough that a mirrored heading looks plausible
-## until you watch someone walk into a tent they are facing away from.
+## **Heading.** Four exist, but the pack (#93) draws only three walk poses plus a
+## non-directional idle — `LEFT` mirrors `RIGHT` (`should_flip_h`) rather than getting
+## its own set. Getting a heading backwards still points every mage the wrong way, and
+## the arena is symmetric enough that a mirrored heading looks plausible until you watch
+## someone walk into a tent they are facing away from.
 ##
 ## **Posture.** Idle, walk, cast. Casting wins over walking (you can do both at once, and
 ## the spell is the read); a snapshot nudge is not a walk.
@@ -123,6 +125,56 @@ func test_casting_at_your_own_feet_does_not_spin_you() -> void:
 	)
 
 
+# ── Travel speed ──────────────────────────────────────────────────────────────────
+
+
+func test_a_player_controlled_fighter_is_judged_on_its_own_predicted_move() -> void:
+	var was_at := Vector2(100.0, 100.0)
+	var predicted_at := was_at + Vector2(2.0, 0.0)
+	assert_almost_eq(
+		Fighter.travel_speed_for(true, was_at, predicted_at, was_at, 1.0 / 60.0),
+		was_at.distance_to(predicted_at) / (1.0 / 60.0),
+		"a player-controlled fighter's speed comes from its own predicted move"
+	)
+
+
+func test_a_stationary_caster_is_not_read_as_walking_by_an_active_correction() -> void:
+	# The regression this guards: before this fix, a player-controlled fighter standing
+	# still while a server correction actively pulled it toward a drifted-apart server
+	# position read as running — CORRECTION_THRESHOLD's dead zone means any correction
+	# that fires at all starts well above WALK_SPEED_THRESHOLD. Invisible before #93,
+	# because casting always showed a dedicated cast pose regardless of speed; visible
+	# the moment a cast with no art of its own fell back to WALK/IDLE.
+	var was_at := Vector2(100.0, 100.0)
+	var predicted_at := was_at # no input, so move_and_slide() went nowhere
+	var corrected_at := was_at + Vector2(Fighter.CORRECTION_THRESHOLD + 5.0, 0.0)
+	var speed := Fighter.travel_speed_for(true, was_at, predicted_at, corrected_at, 1.0 / 60.0)
+	assert_true(
+		speed <= Fighter.WALK_SPEED_THRESHOLD,
+		"an active correction must not make a genuinely stationary player read as walking"
+	)
+
+
+func test_a_remote_fighter_is_judged_on_the_corrected_position() -> void:
+	# A remote fighter has no prediction of its own — the corrected position is the
+	# only signal it has of moving at all.
+	var was_at := Vector2(100.0, 100.0)
+	var corrected_at := was_at + Vector2(50.0, 0.0)
+	assert_almost_eq(
+		Fighter.travel_speed_for(false, was_at, was_at, corrected_at, 1.0 / 60.0),
+		was_at.distance_to(corrected_at) / (1.0 / 60.0),
+		"a remote fighter's speed has to come from the corrected position — it has no other"
+	)
+
+
+func test_travel_speed_does_not_divide_by_a_zero_or_negative_delta() -> void:
+	assert_eq(
+		Fighter.travel_speed_for(true, Vector2.ZERO, Vector2(50, 0), Vector2(50, 0), 0.0),
+		0.0,
+		"a zero delta must not divide by zero"
+	)
+
+
 # ── Posture ───────────────────────────────────────────────────────────────────────
 
 
@@ -175,30 +227,59 @@ func test_recovery_is_not_a_cast() -> void:
 
 func test_the_animation_name_is_posture_then_heading() -> void:
 	assert_eq(
-		Fighter.animation_name(WALK, LEFT), &"walk_left",
-		"the name is <posture>_<heading>, matching the sets in wizard_frames.tres"
+		Fighter.animation_name(WALK, RIGHT), &"walk_right",
+		"the name is <posture>_<heading>, matching the sets in mage_frames.tres"
 	)
 	assert_eq(
 		Fighter.animation_name(CAST, UP), &"cast_up",
-		"a cast set is named the same way"
+		"a cast set is named the same way, unchanged since before #93"
 	)
+
+
+func test_walking_left_borrows_walk_rights_name() -> void:
+	# No walk_left in the pack (#93) — should_flip_h is what turns this into a mirrored
+	# walk rather than a fighter who faces left but visibly walks right.
+	assert_eq(
+		Fighter.animation_name(WALK, LEFT), Fighter.animation_name(WALK, RIGHT),
+		"left has no walk set of its own — it plays right's, mirrored"
+	)
+
+
+func test_only_left_is_drawn_mirrored() -> void:
+	assert_true(Fighter.should_flip_h(LEFT), "left has no art of its own to mirror right into")
+	for facing in [DOWN, UP, RIGHT]:
+		assert_false(
+			Fighter.should_flip_h(facing),
+			"only left borrows another heading's animation — the rest play their own art"
+		)
 
 
 func test_idle_and_walk_are_told_apart_by_name() -> void:
-	# The pack draws no standing pose — idle and walk share frames — but they are two
-	# animations at different speeds, so the name has to distinguish them.
+	# Idle and walk are separate art now (#93), not two speeds over shared frames — but
+	# the name still has to distinguish them, the same contract as before.
 	assert_true(
 		Fighter.animation_name(IDLE, DOWN) != Fighter.animation_name(WALK, DOWN),
-		"idle and walk must resolve to different animations so idle can play slower"
+		"idle and walk must resolve to different animations"
 	)
 
 
-func test_every_posture_and_heading_has_a_name() -> void:
+func test_idle_does_not_care_which_way_you_are_facing() -> void:
+	# The pack draws one non-directional idle (#93) — every heading names the same
+	# animation, unlike walk.
+	for facing in [DOWN, UP, LEFT, RIGHT]:
+		assert_eq(
+			Fighter.animation_name(IDLE, facing), &"idle",
+			"idle has no per-heading set to pick between"
+		)
+
+
+func test_every_animation_the_client_can_name_totals_eight() -> void:
 	var seen := {}
 	for anim in [IDLE, WALK, CAST]:
 		for facing in [DOWN, UP, LEFT, RIGHT]:
 			seen[Fighter.animation_name(anim, facing)] = true
 	assert_eq(
-		seen.size(), 12,
-		"three postures across four headings must name twelve distinct animations"
+		seen.size(), 8,
+		"one idle, three walk headings (left borrows right), and four dormant cast " +
+		"headings (#93) name eight distinct animations"
 	)

@@ -2,7 +2,7 @@ extends TestCase
 
 ## `client/scenes/fighter.tscn` is authored now, not built in `Fighter._ready()`, and it
 ## inherits `common/body_base.tscn` for the circle and the collision layers. These pin
-## the authored nodes to the code-side source of truth — `client/art/wizard_frames.tres`
+## the authored nodes to the code-side source of truth — `client/art/mage_frames.tres`
 ## for the character's animations, `SpellFX` for the aura material, the `FighterChrome`
 ## script for the overhead measurements — so a change to one the scene did not follow
 ## fails here rather than as a fighter who hops, vanishes, or stops colliding. The shared
@@ -10,7 +10,7 @@ extends TestCase
 ## client-side twin of `tests/test_player_body.gd`.
 
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
-const FRAMES := preload("res://client/art/wizard_frames.tres")
+const FRAMES := preload("res://client/art/mage_frames.tres")
 const CHROME := preload("res://client/art/fighter_chrome.tres")
 
 var fighter: Fighter
@@ -48,20 +48,20 @@ func test_the_character_is_an_animated_sprite_playing_the_authored_pack() -> voi
 	assert_eq(
 		character.sprite_frames,
 		FRAMES,
-		"the Character node must play the authored wizard_frames.tres, not a copy"
+		"the Character node must play the authored mage_frames.tres, not a copy"
 	)
-	assert_false(
+	assert_true(
 		character.centered,
-		"a centred 79x65 cell lands the feet on a half-pixel and blurs the pixel art"
+		"a centred, even 70x70 cell needs no manual offset and mirrors safely for flip_h"
 	)
 	assert_eq(
 		character.offset,
-		Vector2(-31.0, -49.0),
+		Vector2(0.0, -34.0),
 		"the authored offset must stand the pack's registered feet on the body origin"
 	)
 	assert_eq(
 		character.animation,
-		&"idle_down",
+		&"idle",
 		"a fighter that has not moved yet faces the camera, standing"
 	)
 	assert_eq(
@@ -99,9 +99,14 @@ func test_the_ui_layer_keeps_linear_filtering_for_the_mantra() -> void:
 
 
 func test_the_layers_draw_in_reading_order() -> void:
+	var shadow_index := fighter.get_node("Shadow").get_index()
 	var character_index := fighter.get_node("Character").get_index()
 	var fx_index := fighter.get_node("FX").get_index()
 	var ui_index := fighter.get_node("UI").get_index()
+	assert_true(
+		shadow_index < character_index,
+		"the ground shadow must draw under the character, so Shadow comes first"
+	)
 	assert_true(
 		character_index < fx_index,
 		"the aura must draw over the character, so FX comes after it in the tree"
