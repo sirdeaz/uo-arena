@@ -87,7 +87,7 @@ if [ "$want_linux" -eq 1 ]; then
     rm -rf build/UOArena-linux-x86_64
     mkdir -p build/UOArena-linux-x86_64
     cp build/linux/* build/UOArena-linux-x86_64/
-    cp "dist/READ ME FIRST.txt" build/UOArena-linux-x86_64/
+    cp "packaging/READ ME FIRST.txt" build/UOArena-linux-x86_64/
     chmod +x build/UOArena-linux-x86_64/UOArena.x86_64
 
     rm -f build/UOArena-linux-x86_64.tar.gz

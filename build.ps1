@@ -72,7 +72,7 @@ Editor Settings > Export > Windows > Rcedit, then run this script again.
     Get-ChildItem $out -File | ForEach-Object {
         Copy-Item $_.FullName -Destination (Join-Path $stage $_.Name)
     }
-    Copy-Item (Join-Path $root "dist\READ ME FIRST.txt") -Destination $stage
+    Copy-Item (Join-Path $root "packaging\READ ME FIRST.txt") -Destination $stage
 
     $zip = Join-Path $root "build\UOArena-win64.zip"
     if (Test-Path $zip) { Remove-Item $zip -Force }
