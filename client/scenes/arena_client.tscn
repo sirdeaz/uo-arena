@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bun3pxnce85c1"]
 
-[ext_resource type="Script" uid="uid://cuovkx1tm45yf" path="res://client/arena_client.gd" id="1_arena_client"]
+[ext_resource type="Script" uid="uid://cuovkx1tm45yf" path="res://client/scenes/arena_client.gd" id="1_arena_client"]
 [ext_resource type="PackedScene" uid="uid://crg0hjmen880g" path="res://arena/arena_map.tscn" id="2_arena"]
 [ext_resource type="PackedScene" path="res://client/scenes/arena_stage.tscn" id="3_stage"]
 

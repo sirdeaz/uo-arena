@@ -1,6 +1,6 @@
 [gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://client/arena_hud.gd" id="1_hud"]
+[ext_resource type="Script" path="res://client/scenes/arena_hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://client/cast_bar_ui.gd" id="2_cast_bar"]
 
 [node name="ArenaHud" type="CanvasLayer"]
