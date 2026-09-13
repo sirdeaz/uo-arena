@@ -43,11 +43,14 @@ overhang the cell they're planted in instead of the collision box implying a tre
 wide.
 
 - `tree_pine.png` (64×70) and `tree_broadleaf.png` (48×80) each carry a collision
-  polygon sized to their trunk, not their full canopy — traced from where the sprite's
-  own opaque pixels actually narrow to a base, not eyeballed. Neither tile has been
-  painted into `arena/arena_map.tscn` yet: they're staged as ready-to-place tiles in the
-  tileset, same shape as any existing `Cover` tile, but placing them is still an editor
-  pass (#110).
+  polygon following their canopy's own silhouette — traced band-by-band from where the
+  sprite's opaque pixels actually are, not eyeballed and not the tile's full bounding
+  box. An earlier pass here shrank the polygon to just the trunk, reasoning that the
+  collision shouldn't claim more than the art; in practice that let a spell's raycast
+  pass straight through the wide, obviously-solid-looking canopy, since a ray aimed at
+  the visible tree just doesn't cross a trunk-width sliver near its base. The fix is
+  the same principle pointed the other way: the collision should match what a player
+  *reads* as solid, and for a tree that's the canopy, not the trunk alone.
 - `bush.png` is 40×32 and carries no collision polygon at all — walkable, matching every
   other floor tile.
 - **Both trees are painted centred on their tile**, same as every existing tile in this
@@ -58,8 +61,19 @@ wide.
   `tree_pine.png` wants roughly 19px and `tree_broadleaf.png` roughly 24px as a starting
   point. **If `texture_origin` moves, shift the tile's collision polygon points by the
   same Y amount** — the two are independent properties in Godot's `TileData` and don't
-  move together automatically; leaving the polygon behind plants the collision in mid-air
-  instead of under the visible trunk.
+  move together automatically; leaving the polygon behind desyncs it from the visible
+  canopy the same way the trunk-only version once did.
+- **Paint the bush onto `Floor`, not `Cover`.** `tests/test_arena_tiles.gd`'s
+  `test_no_tile_in_an_obstacle_layer_is_missing_its_collision` treats every painted
+  `Cover`/`Walls` cell as required to collide — that's the whole rule this tileset
+  runs on, "the tile is the collision, and the collision is not art." A walkable bush
+  belongs on `Floor` (or a new decorative layer with the same no-collision guarantee),
+  never on `Cover`, or that test correctly fails.
+- **Keep trees out of the duel lane and the spawn sightlines.** The canopy collision
+  above is wide on purpose — wide enough that a tree planted in or near the centre
+  lane will trip `tests/test_path_finder.gd`'s and `tests/test_arena_server.gd`'s
+  "the duel lane stays walkable" / "spawns can see each other" checks, same as
+  dropping a tent there would.
 - **Source:** supplied by the user; provenance not yet recorded.
 - **Licence:** ⚠️ **not settled** — same open state as `Grass-01.png` above, not a
   finished answer. Settle before either ships anywhere a player downloads a build.

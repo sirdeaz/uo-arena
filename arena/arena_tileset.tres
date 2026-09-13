@@ -1,9 +1,9 @@
 [gd_resource type="TileSet" format=3 uid="uid://bwf1ay3vly7nd"]
 
 [ext_resource type="Texture2D" uid="uid://cvftwo7huc4bv" path="res://client/art/Grass-01.png" id="1_grass"]
-[ext_resource type="Texture2D" path="res://client/art/tree_pine.png" id="2_tree_pine"]
-[ext_resource type="Texture2D" path="res://client/art/tree_broadleaf.png" id="3_tree_broadleaf"]
-[ext_resource type="Texture2D" path="res://client/art/bush.png" id="4_bush"]
+[ext_resource type="Texture2D" uid="uid://cm42ovielmrrq" path="res://client/art/tree_pine.png" id="2_tree_pine"]
+[ext_resource type="Texture2D" uid="uid://cmv0xfwtlw08p" path="res://client/art/tree_broadleaf.png" id="3_tree_broadleaf"]
+[ext_resource type="Texture2D" uid="uid://j5ofjyn4v0mg" path="res://client/art/bush.png" id="4_bush"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_arena"]
 texture = ExtResource("1_grass")
@@ -186,13 +186,13 @@ texture_region_size = Vector2i(32, 32)
 texture = ExtResource("2_tree_pine")
 texture_region_size = Vector2i(64, 70)
 0:0/0 = 0
-0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-11, 23, 12, 23, 12, 35, -11, 35)
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-11, 35, -20, 24.5, -31, 10.5, -32, -17.5, -25, -35, 24, -35, 32, -17.5, 32, 10.5, 22, 24.5, 12, 35)
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_tree_broadleaf"]
 texture = ExtResource("3_tree_broadleaf")
 texture_region_size = Vector2i(48, 80)
 0:0/0 = 0
-0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-11, 27, 10, 27, 10, 40, -11, 40)
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-11, 40, -23, 28, -24, 10, -22, -8, -14, -36, 14, -36, 22, -8, 24, 10, 22, 28, 10, 40)
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_bush"]
 texture = ExtResource("4_bush")
