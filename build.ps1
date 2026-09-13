@@ -24,7 +24,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "tools\Godot.ps1")
+. (Join-Path $PSScriptRoot "tools\godot.ps1")
 
 if (-not $Windows -and -not $Web -and -not $Server) { $Windows = $true; $Web = $true }
 
