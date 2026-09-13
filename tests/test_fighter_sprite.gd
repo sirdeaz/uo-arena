@@ -125,6 +125,56 @@ func test_casting_at_your_own_feet_does_not_spin_you() -> void:
 	)
 
 
+# ── Travel speed ──────────────────────────────────────────────────────────────────
+
+
+func test_a_player_controlled_fighter_is_judged_on_its_own_predicted_move() -> void:
+	var was_at := Vector2(100.0, 100.0)
+	var predicted_at := was_at + Vector2(2.0, 0.0)
+	assert_almost_eq(
+		Fighter.travel_speed_for(true, was_at, predicted_at, was_at, 1.0 / 60.0),
+		was_at.distance_to(predicted_at) / (1.0 / 60.0),
+		"a player-controlled fighter's speed comes from its own predicted move"
+	)
+
+
+func test_a_stationary_caster_is_not_read_as_walking_by_an_active_correction() -> void:
+	# The regression this guards: before this fix, a player-controlled fighter standing
+	# still while a server correction actively pulled it toward a drifted-apart server
+	# position read as running — CORRECTION_THRESHOLD's dead zone means any correction
+	# that fires at all starts well above WALK_SPEED_THRESHOLD. Invisible before #93,
+	# because casting always showed a dedicated cast pose regardless of speed; visible
+	# the moment a cast with no art of its own fell back to WALK/IDLE.
+	var was_at := Vector2(100.0, 100.0)
+	var predicted_at := was_at # no input, so move_and_slide() went nowhere
+	var corrected_at := was_at + Vector2(Fighter.CORRECTION_THRESHOLD + 5.0, 0.0)
+	var speed := Fighter.travel_speed_for(true, was_at, predicted_at, corrected_at, 1.0 / 60.0)
+	assert_true(
+		speed <= Fighter.WALK_SPEED_THRESHOLD,
+		"an active correction must not make a genuinely stationary player read as walking"
+	)
+
+
+func test_a_remote_fighter_is_judged_on_the_corrected_position() -> void:
+	# A remote fighter has no prediction of its own — the corrected position is the
+	# only signal it has of moving at all.
+	var was_at := Vector2(100.0, 100.0)
+	var corrected_at := was_at + Vector2(50.0, 0.0)
+	assert_almost_eq(
+		Fighter.travel_speed_for(false, was_at, was_at, corrected_at, 1.0 / 60.0),
+		was_at.distance_to(corrected_at) / (1.0 / 60.0),
+		"a remote fighter's speed has to come from the corrected position — it has no other"
+	)
+
+
+func test_travel_speed_does_not_divide_by_a_zero_or_negative_delta() -> void:
+	assert_eq(
+		Fighter.travel_speed_for(true, Vector2.ZERO, Vector2(50, 0), Vector2(50, 0), 0.0),
+		0.0,
+		"a zero delta must not divide by zero"
+	)
+
+
 # ── Posture ───────────────────────────────────────────────────────────────────────
 
 

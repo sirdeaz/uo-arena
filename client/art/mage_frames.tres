@@ -1,4 +1,4 @@
-[gd_resource type="SpriteFrames" load_steps=37 format=3]
+[gd_resource type="SpriteFrames" format=3 uid="uid://cy48u3rvs2wyy"]
 
 [ext_resource type="Texture2D" uid="uid://pjdhm8w4ylfb" path="res://client/art/mage_idle.png" id="1_mage_idle"]
 [ext_resource type="Texture2D" uid="uid://symgovjsvllw" path="res://client/art/mage_walk_down.png" id="2_mage_walk_down"]
@@ -138,144 +138,116 @@ animations = [{
 "frames": [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle0")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle1")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle2")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle3")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle4")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle5")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle6")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_idle7")
 }],
-"loop": true,
+"loop": 1,
 "name": &"idle",
 "speed": 6.0
 }, {
 "frames": [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down0")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down1")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down2")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down3")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down4")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down5")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down6")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_down7")
 }],
-"loop": true,
+"loop": 1,
 "name": &"walk_down",
 "speed": 12.0
 }, {
 "frames": [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right0")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right1")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right2")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right3")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right4")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right5")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right6")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_right7")
 }],
-"loop": true,
+"loop": 1,
 "name": &"walk_right",
 "speed": 12.0
 }, {
 "frames": [{
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up0")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up1")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up2")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up3")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up4")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up5")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up6")
-},
-{
+}, {
 "duration": 1.0,
 "texture": SubResource("AtlasTexture_mage_walk_up7")
 }],
-"loop": true,
+"loop": 1,
 "name": &"walk_up",
 "speed": 12.0
 }]

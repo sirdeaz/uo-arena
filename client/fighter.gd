@@ -199,14 +199,16 @@ func _physics_process(delta: float) -> void:
 
 	var was_at := global_position
 	move_and_slide()
+	var predicted_at := global_position
 
 	if server_driven:
 		_apply_server_correction(delta)
 	else:
 		combatant.position = global_position
 
-	if delta > 0.0:
-		_travel_speed = was_at.distance_to(global_position) / delta
+	_travel_speed = travel_speed_for(
+		player_controlled, was_at, predicted_at, global_position, delta
+	)
 	_update_facing(global_position - was_at)
 	_update_character_animation()
 
@@ -401,6 +403,35 @@ static func heading_for(
 		var at: Vector2 = aim
 		return facing_for(at - from, previous)
 	return facing_for(travelled, previous)
+
+
+## The speed `animation_for` should judge WALK/IDLE against, given where this body
+## actually was, where its own prediction (or lack of one) put it, and where it ended
+## up after any server correction.
+##
+## A player-controlled fighter's own predicted move is what "walking" means for them —
+## measuring speed after a server correction instead would fold in however fast an
+## active correction is currently pulling them on top of that, which can read as a
+## dead sprint while genuinely standing still. `CORRECTION_THRESHOLD`'s dead zone means
+## this is not a rare edge case: any correction that fires at all starts well above
+## `WALK_SPEED_THRESHOLD`. Before #93 this stayed invisible — casting always showed a
+## dedicated cast pose regardless of speed — but a cast with no art of its own now
+## falls back to whatever WALK/IDLE would show, which is exactly where it surfaced: a
+## stationary, casting, player-controlled fighter reading as walking.
+##
+## A remote fighter has no prediction of its own to measure — the corrected position is
+## the only signal it has of moving at all, so it keeps using that.
+static func travel_speed_for(
+	player_controlled: bool,
+	was_at: Vector2,
+	predicted_at: Vector2,
+	corrected_at: Vector2,
+	delta: float
+) -> float:
+	if delta <= 0.0:
+		return 0.0
+	var moved_to := predicted_at if player_controlled else corrected_at
+	return was_at.distance_to(moved_to) / delta
 
 
 ## Which posture a fighter in `state`, travelling at `speed` px/s, should be showing.
