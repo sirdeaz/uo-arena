@@ -6,7 +6,7 @@
 
 $ErrorActionPreference = "Stop"
 
-. (Join-Path $PSScriptRoot "tools\Godot.ps1")
+. (Join-Path $PSScriptRoot "tools\godot.ps1")
 
 $godot = Find-Godot -Console
 Assert-Godot4 $godot
