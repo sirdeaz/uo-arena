@@ -53,11 +53,29 @@ explicit filesystem grants. Point `GODOT_BIN` at a wrapper script if you want it
 ## Layout
 
 ```
-common/      shared rules — spell data, cast state machine, constants
-server/      authoritative logic only, no rendering (exports as Dedicated Server)
-client/      input, rendering, prediction/interpolation, UI
+arena/       the shared arena map — hand-painted, read back rather than described in code
 autoload/    network_manager.gd picks client vs server role at boot
+client/      input, rendering, prediction/interpolation, UI
+common/      shared rules — spell data, cast state machine, constants
+docs/        design notes (art direction, sprite pipeline) that aren't code
+packaging/   end-user-facing files (a plain-English readme) that ship inside a build
+server/      authoritative logic only, no rendering (exports as Dedicated Server)
+tests/       the headless suite run_tests.sh drives, plus a manual/ interactive fixture
+tools/       dev scripts: locating Godot, generating the Windows icon, capturing a promo shot
 ```
+
+`arena/` is not part of `common/`, even though both hold data shared between client and
+server. `arena/arena_map.tscn` is the one scene both sides instance directly — the
+server runs it headless for collision, the client renders it — rather than a set of
+rules either side interprets on its own, and CLAUDE.md treats it as such ("the arena is
+read back, not described"). Folding it into `common/` would blur that distinction for
+no real gain: most of its references are hardcoded `load()` calls in tests anyway, not
+resource links a merge would meaningfully simplify.
+
+`tests/manual/` is a deliberate exception to the rest of `tests/`: everything else is a
+`test_*.gd` unit test discovered automatically by `tests/test_main.gd`, but
+`tests/manual/loopback.gd` is a runnable interactive fixture with its own scene, meant
+to be launched by hand rather than picked up by `run_tests.sh`.
 
 `client/palette.gd` holds every colour in the game. They are all `_draw()` arguments —
 there are no textures, sprites or shaders — so the palette is the art. It is grouped by
