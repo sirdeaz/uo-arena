@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://d0485hegx0kbv"]
 
-[ext_resource type="Script" uid="uid://7xehd2dg1cse" path="res://client/local_test.gd" id="1_local_test"]
+[ext_resource type="Script" uid="uid://7xehd2dg1cse" path="res://client/scenes/local_test.gd" id="1_local_test"]
 [ext_resource type="PackedScene" uid="uid://crg0hjmen880g" path="res://arena/arena_map.tscn" id="2_arena"]
 [ext_resource type="PackedScene" path="res://client/scenes/arena_stage.tscn" id="3_stage"]
 [ext_resource type="PackedScene" path="res://client/scenes/fighter.tscn" id="4_fighter"]
