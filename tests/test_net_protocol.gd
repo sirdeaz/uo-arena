@@ -45,6 +45,16 @@ func test_the_peer_id_is_readable_without_decoding_the_rest() -> void:
 	)
 
 
+func test_the_input_ack_is_readable_without_decoding_the_rest() -> void:
+	# Fighter.receive_server_snapshot is the only reader that matters (#113), but it reads
+	# this the same way ArenaClient reads the peer id — before applying the rest.
+	assert_eq(
+		NetProtocol.input_ack_of(NetProtocol.encode_combatant(7, source, 42)),
+		42,
+		"the local player's reconciliation reads this before it replays anything"
+	)
+
+
 func test_status_rings_survive_as_booleans() -> void:
 	source.apply_poison(8.0, 3.0)
 	source.apply_paralyze(4.0)

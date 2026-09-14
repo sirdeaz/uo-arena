@@ -244,8 +244,8 @@ func _return_to_menu(reason: String) -> void:
 	get_tree().change_scene_to_file.call_deferred("res://client/client_main.tscn")
 
 
-func _on_local_input_changed(direction: Vector2) -> void:
-	submit_input.rpc_id(1, direction)
+func _on_local_input_changed(direction: Vector2, sequence: int) -> void:
+	submit_input.rpc_id(1, direction, sequence)
 
 
 func _on_local_cast_requested(spell_id: int, target_peer: int) -> void:
@@ -294,11 +294,11 @@ func join_arena(protocol_version: int) -> void:
 
 
 @rpc("any_peer", "call_remote", "unreliable_ordered")
-func submit_input(direction: Vector2) -> void:
+func submit_input(direction: Vector2, sequence: int) -> void:
 	if not multiplayer.is_server() or arena_server == null:
 		return
 	arena_server.set_input(
-		multiplayer.get_remote_sender_id(), NetProtocol.sanitize_direction(direction)
+		multiplayer.get_remote_sender_id(), NetProtocol.sanitize_direction(direction), sequence
 	)
 
 

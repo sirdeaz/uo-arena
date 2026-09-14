@@ -138,20 +138,21 @@ func test_a_player_controlled_fighter_is_judged_on_its_own_predicted_move() -> v
 	)
 
 
-func test_a_stationary_caster_is_not_read_as_walking_by_an_active_correction() -> void:
-	# The regression this guards: before this fix, a player-controlled fighter standing
-	# still while a server correction actively pulled it toward a drifted-apart server
-	# position read as running — CORRECTION_THRESHOLD's dead zone means any correction
-	# that fires at all starts well above WALK_SPEED_THRESHOLD. Invisible before #93,
-	# because casting always showed a dedicated cast pose regardless of speed; visible
-	# the moment a cast with no art of its own fell back to WALK/IDLE.
+func test_a_stationary_caster_is_not_read_as_walking_by_a_position_correction() -> void:
+	# The regression this guards: a player-controlled fighter standing still must never
+	# read its travel speed off wherever some other position happens to be — only its own
+	# predicted move says whether it walked. Invisible before #93, because casting always
+	# showed a dedicated cast pose regardless of speed; visible the moment a cast with no
+	# art of its own fell back to WALK/IDLE. Before #113 that "other position" was an
+	# active server-correction lerp for the local player too; it is now only ever a
+	# remote fighter's, but the invariant `travel_speed_for` has to hold is unchanged.
 	var was_at := Vector2(100.0, 100.0)
 	var predicted_at := was_at # no input, so move_and_slide() went nowhere
-	var corrected_at := was_at + Vector2(Fighter.CORRECTION_THRESHOLD + 5.0, 0.0)
+	var corrected_at := was_at + Vector2(50.0, 0.0) # some other position entirely
 	var speed := Fighter.travel_speed_for(true, was_at, predicted_at, corrected_at, 1.0 / 60.0)
 	assert_true(
 		speed <= Fighter.WALK_SPEED_THRESHOLD,
-		"an active correction must not make a genuinely stationary player read as walking"
+		"a position correction elsewhere must not make a genuinely stationary player read as walking"
 	)
 
 

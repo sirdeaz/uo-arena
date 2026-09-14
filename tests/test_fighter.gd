@@ -161,29 +161,21 @@ func test_a_sceneless_fighter_still_stands_up() -> void:
 	bare.queue_free()
 
 
-# ── corrected_position ──────────────────────────────────────────────────────────────
+# ── corrected_position: remote fighters only since #113 ─────────────────────────────
 #
-# Static, so the reconciliation curve is checked directly rather than by puppeting a
-# scene tree through a fake network round trip.
+# Static, so the remote-fighter reconciliation curve is checked directly rather than by
+# puppeting a scene tree through a fake network round trip. The local player no longer
+# goes through this at all — see the reconciliation-replay section further down.
 
 
-func test_player_controlled_does_not_fight_honest_lag_below_the_dead_zone() -> void:
+func test_a_remote_fighter_tracks_even_the_smallest_drift() -> void:
+	# Nobody predicts a remote fighter, so there is no dead zone to sit still inside — it
+	# is always easing toward the last snapshot, however small the step.
 	var current := Vector2(100.0, 100.0)
-	var target := current + Vector2(Fighter.CORRECTION_THRESHOLD - 1.0, 0.0)
-	assert_eq(
-		Fighter.corrected_position(current, target, 1.0 / 60.0, true),
-		current,
-		"drift under CORRECTION_THRESHOLD must be left alone, or honest lag gets nagged at"
-	)
-
-
-func test_player_controlled_lerps_rather_than_snaps_past_the_dead_zone() -> void:
-	var current := Vector2(100.0, 100.0)
-	var target := current + Vector2(Fighter.CORRECTION_THRESHOLD + 10.0, 0.0)
-	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0, true)
+	var target := current + Vector2(1.0, 0.0)
+	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0)
 	assert_true(
-		corrected != current and corrected != target,
-		"past the dead zone this must ease toward the server, not sit still or snap"
+		corrected != current, "a remote fighter must smooth toward even a tiny drift"
 	)
 
 
@@ -193,7 +185,7 @@ func test_a_lost_stop_packet_alone_does_not_trip_the_teleport_snap() -> void:
 	# sat past TELEPORT_THRESHOLD (120.0) and hard-snapped on every ordinary WAN hiccup.
 	var current := Vector2(100.0, 100.0)
 	var target := current + Vector2(Fighter.MAX_HONEST_DRIFT, 0.0)
-	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0, true)
+	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0)
 	assert_true(
 		corrected != target,
 		"the server's own documented worst-case drift must not read as a teleport"
@@ -204,19 +196,92 @@ func test_past_teleport_threshold_snaps_outright() -> void:
 	var current := Vector2(100.0, 100.0)
 	var target := current + Vector2(Fighter.TELEPORT_THRESHOLD + 1.0, 0.0)
 	assert_eq(
-		Fighter.corrected_position(current, target, 1.0 / 60.0, true),
+		Fighter.corrected_position(current, target, 1.0 / 60.0),
 		target,
 		"a respawn-sized jump must snap outright, not slide the body across the arena"
 	)
 
 
-func test_a_remote_fighter_tracks_even_drift_under_the_dead_zone() -> void:
-	# Nobody predicts a remote fighter, so unlike the local player it has no dead zone —
-	# it is always easing toward the last snapshot, however small the step.
-	var current := Vector2(100.0, 100.0)
-	var target := current + Vector2(Fighter.CORRECTION_THRESHOLD - 1.0, 0.0)
-	var corrected := Fighter.corrected_position(current, target, 1.0 / 60.0, false)
-	assert_true(
-		corrected != current,
-		"a remote fighter must smooth toward drift a local player would ignore"
+# ── Reconciliation replay: the local player's own path since #113 ───────────────────
+#
+# `inputs_to_replay`/`trim_input_history` are the decisions, pulled out static so they
+# are checkable the same way `movement_direction_toward`/`facing_for` are — no scene
+# tree, no fake network round trip.
+
+
+func test_inputs_at_or_before_the_ack_are_not_replayed() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true},
+		{"sequence": 1, "direction": Vector2.RIGHT, "can_move": true},
+	]
+	assert_eq(
+		Fighter.inputs_to_replay(history, 1),
+		[],
+		"the server has already folded everything up to and including the ack"
 	)
+
+
+func test_inputs_after_the_ack_are_replayed_in_order() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true},
+		{"sequence": 1, "direction": Vector2.UP, "can_move": true},
+		{"sequence": 2, "direction": Vector2.DOWN, "can_move": true},
+	]
+	var replay := Fighter.inputs_to_replay(history, 0)
+	assert_eq(replay.size(), 2, "only what came after the ack needs replaying")
+	assert_eq(replay[0]["sequence"], 1, "replay must not reorder the buffered history")
+	assert_eq(replay[1]["sequence"], 2, "replay must not reorder the buffered history")
+
+
+func test_no_ack_yet_replays_the_entire_buffer() -> void:
+	# -1 is what a fighter starts with before its first snapshot ever names an ack — see
+	# `_server_input_ack`'s own doc comment. Nothing is confirmed yet, so nothing is
+	# dropped.
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true},
+	]
+	assert_eq(
+		Fighter.inputs_to_replay(history, -1).size(),
+		1,
+		"with no ack yet, the whole buffer is still unconfirmed"
+	)
+
+
+func test_trimming_keeps_the_newest_entries() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.ZERO, "can_move": true},
+		{"sequence": 1, "direction": Vector2.ZERO, "can_move": true},
+		{"sequence": 2, "direction": Vector2.ZERO, "can_move": true},
+	]
+	var trimmed := Fighter.trim_input_history(history, 2)
+	assert_eq(trimmed.size(), 2, "a long stall must not replay an unbounded backlog")
+	assert_eq(trimmed[0]["sequence"], 1, "the oldest entry is what gets dropped")
+	assert_eq(trimmed[1]["sequence"], 2, "the newest entries survive the trim")
+
+
+func test_trimming_under_the_bound_changes_nothing() -> void:
+	var history: Array[Dictionary] = [{"sequence": 0, "direction": Vector2.ZERO, "can_move": true}]
+	assert_eq(
+		Fighter.trim_input_history(history, 10).size(),
+		1,
+		"a buffer already under the bound must not lose anything"
+	)
+
+
+func test_a_snapshot_resets_the_local_player_to_the_authoritative_position() -> void:
+	# The end-to-end replacement for the old lerp-and-hope blend: a drifted-apart local
+	# fighter resets outright on the next tick rather than easing back toward the server.
+	var fighter := FIGHTER_SCENE.instantiate()
+	fighter.server_driven = true
+	fighter.player_controlled = true
+	add_child(fighter)
+	fighter.global_position = Vector2(500.0, 500.0)
+
+	fighter.receive_server_snapshot(Vector2.ZERO, 0)
+	await get_tree().physics_frame
+
+	assert_true(
+		fighter.global_position.distance_to(Vector2.ZERO) < 1.0,
+		"a reconciling local player must land on the server's own position, not ease toward it"
+	)
+	fighter.queue_free()
