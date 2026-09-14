@@ -121,16 +121,24 @@ func _flag_value(flag: String) -> String:
 # bodies and to nothing else: no caller knows which one it got.
 
 
+## Godot's SceneMultiplayer reserves three ENet channels for its own transfer modes
+## (reliable, unreliable, unreliable_ordered) before any user channel is handed out.
+## Leaving `max_channels` at its default asks ENet for zero, so the very first
+## unreliable_ordered send — `receive_snapshot()`, on channel 1 — is rejected and the
+## peer is torn down (#116). Server and client must agree on this number.
+const _ENET_CHANNELS: int = 3
+
+
 func _create_server_peer(port: int) -> MultiplayerPeer:
 	var peer := ENetMultiplayerPeer.new()
-	if peer.create_server(port, Constants.MAX_PLAYERS) != OK:
+	if peer.create_server(port, Constants.MAX_PLAYERS, _ENET_CHANNELS) != OK:
 		return null
 	return peer
 
 
 func _create_client_peer(address: String, port: int) -> MultiplayerPeer:
 	var peer := ENetMultiplayerPeer.new()
-	if peer.create_client(address, port) != OK:
+	if peer.create_client(address, port, _ENET_CHANNELS) != OK:
 		return null
 	return peer
 
