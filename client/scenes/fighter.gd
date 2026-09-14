@@ -8,8 +8,9 @@ class_name Fighter
 ##
 ##   offline practice   `server_driven` false — it runs the real rules itself, as it
 ##                      always has, and its own position is the truth.
-##   networked, yours   both flags — steers on your input for feel, and is corrected
-##                      toward whatever the server says.
+##   networked, yours   both flags — steers on your input for feel, and on every
+##                      snapshot resets to the server's position and replays whatever
+##                      it sent that the server had not yet seen (#113).
 ##   networked, theirs  `server_driven` only — no input to read, so it simply coasts
 ##                      to wherever the last snapshot put it.
 
@@ -38,20 +39,17 @@ const MANTRA_COLOR := Palette.MANTRA
 const BURST_SECONDS: float = 0.4
 const RUNE_COUNT: int = 3
 
-## How hard to pull a predicted body back toward the server's version of it. A player
-## keeps running `move_and_slide` on their own input so steering stays instant, and this
-## is what quietly reconciles the guess.
-##
-## At 225 px/s a player legitimately travels 11 px between snapshots, and the round trip
-## adds more, so correcting under this would mean nagging at honest lag.
-const CORRECTION_THRESHOLD: float = 28.0
-
 ## Worst-case honest drift the server itself already tolerates: `submit_input` is
 ## unreliable, so the packet that says "I let go" can go missing, and
 ## `server/arena_server.gd`'s `_step_movement` only gives up and zeroes the input after
 ## `Constants.INPUT_TIMEOUT_SECONDS` — up to that long spent still moving on a stale
 ## direction. `TELEPORT_THRESHOLD` has to clear this with real margin, or the server's
 ## own documented, expected packet loss trips a hard snap on a normal connection (#89).
+##
+## Only `_apply_server_correction`'s remote-fighter lerp reads this now — the local
+## player reconciles by exact replay instead of a threshold blend, which is what #113
+## replaced the old `CORRECTION_THRESHOLD`/`CORRECTION_RATE` player-controlled branch
+## with.
 const MAX_HONEST_DRIFT: float = Constants.PLAYER_MOVE_SPEED * Constants.INPUT_TIMEOUT_SECONDS
 
 ## Past this we are not correcting, we are teleporting — a respawn, or a desync worth
@@ -62,8 +60,13 @@ const MAX_HONEST_DRIFT: float = Constants.PLAYER_MOVE_SPEED * Constants.INPUT_TI
 ## before this stops meaning "give up" and starts meaning "you were only ever lagging."
 const TELEPORT_THRESHOLD: float = MAX_HONEST_DRIFT * 2.0
 
-const CORRECTION_RATE: float = 8.0
 const REMOTE_RATE: float = 18.0
+
+## How much buffered input history a local, server-driven fighter keeps for a
+## reconciliation replay. Bounded so a long stall — a frozen connection, a debugger
+## breakpoint — cannot replay an unbounded backlog of ticks in one frame the moment it
+## reconnects; see #113's own "watch out for" on this exact trap.
+const INPUT_HISTORY_SECONDS: float = 1.0
 
 @export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
@@ -86,6 +89,30 @@ const REMOTE_RATE: float = 18.0
 
 ## Where the server last said this fighter is. Ignored while `server_driven` is false.
 var server_position: Vector2 = Vector2.ZERO
+
+## Set by `receive_server_snapshot` when a fresh snapshot names this fighter's own last
+## acknowledged input. `-1` means no ack has ever arrived — `_input_history` still
+## replays everything buffered in that case rather than discarding it, since there is
+## nothing yet to say any of it is stale.
+var _server_input_ack: int = -1
+
+## True from the moment a snapshot lands for this fighter until the next
+## `_physics_process` consumes it. Reconciliation happens on the physics tick, not in the
+## RPC callback, so movement only ever happens where every other tick of it does.
+var _pending_reconciliation: bool = false
+
+## This tick's sequence number, handed to the next one buffered in `_input_history` and
+## to `ArenaClient` so it can tag the `submit_input` RPC that carries this tick's
+## direction — see `current_input_sequence`.
+var _input_sequence: int = 0
+
+## `{"sequence": int, "direction": Vector2, "can_move": bool}` dictionaries, oldest
+## first — one per physics tick this fighter has been local and server-driven for, kept
+## only long enough to replay after a reconciliation. `can_move` is recorded per tick
+## rather than read fresh at replay time because the two can genuinely differ: a tick
+## recorded while paralyzed must replay as paralyzed even if the paralysis has since worn
+## off, or the replay silently disagrees with what the server actually ran (#113).
+var _input_history: Array[Dictionary] = []
 
 ## Off by default. Getting yourself around cover is the skill this game is about, so this
 ## is an assist you switch on, not the way the game plays.
@@ -189,20 +216,25 @@ func _physics_process(delta: float) -> void:
 	_anim_time += delta
 	_burst_remaining = maxf(0.0, _burst_remaining - delta)
 
-	# Prediction: a server-driven local player still steers itself, because waiting a
-	# round trip to start moving would be felt on every dodge. Remote fighters have no
-	# input to read, so they simply coast to wherever the last snapshot put them.
-	var direction := Vector2.ZERO
-	if player_controlled and combatant.can_move():
-		direction = input_direction()
-	velocity = direction * Constants.PLAYER_MOVE_SPEED
+	# A server-driven local player still steers itself, because waiting a round trip to
+	# start moving would be felt on every dodge. Remote fighters have no input to read,
+	# so they simply coast to wherever the last snapshot put them.
+	var direction := input_direction() if player_controlled else Vector2.ZERO
 
 	var was_at := global_position
-	move_and_slide()
-	var predicted_at := global_position
+	var predicted_at: Vector2
+
+	if server_driven and player_controlled:
+		predicted_at = _step_local_prediction(direction)
+	else:
+		Movement.step(self, direction, combatant.can_move())
+		predicted_at = global_position
 
 	if server_driven:
-		_apply_server_correction(delta)
+		if player_controlled:
+			combatant.position = global_position
+		else:
+			_apply_server_correction(delta)
 	else:
 		combatant.position = global_position
 
@@ -219,40 +251,118 @@ func _physics_process(delta: float) -> void:
 		_fx.queue_redraw()
 
 
-## Pulls this body toward the server's version of where it is. Exponential rather than a
-## raw lerp on delta, so the pull feels the same at any frame rate.
+## The local player's own step, every tick: buffer this tick's input for a later replay,
+## then either run it as a plain step or, if a snapshot landed since the last tick,
+## reconcile first and let that replay carry this tick along as its final entry.
 ##
-## Paralyze and death need nothing special here: both arrive through the snapshot into
-## `can_move()`, so prediction stops on its own about a round trip late, and the
-## overshoot that costs is roughly the size of the correction threshold — which is why
-## the correction is a lerp rather than a snap.
+## Reconciliation is not a separate move on top of the regular step — it replaces it for
+## this one tick, which is what `_reconcile` returning the position it ends at (rather
+## than this function running `Movement.step` again afterwards) guarantees.
+func _step_local_prediction(direction: Vector2) -> Vector2:
+	_record_input(direction)
+	if _pending_reconciliation:
+		_pending_reconciliation = false
+		_reconcile()
+	else:
+		Movement.step(self, direction, combatant.can_move())
+	return global_position
+
+
+## Buffers this tick's input, tagged with a once-per-tick sequence number, for
+## `_reconcile` to replay later. Trimmed to `INPUT_HISTORY_SECONDS` worth of ticks — see
+## that constant's own doc comment for why the bound exists at all.
+func _record_input(direction: Vector2) -> void:
+	_input_history.append({
+		"sequence": _input_sequence,
+		"direction": direction,
+		"can_move": combatant.can_move(),
+	})
+	_input_sequence += 1
+
+	var max_entries := int(ceil(INPUT_HISTORY_SECONDS * Engine.physics_ticks_per_second))
+	_input_history = trim_input_history(_input_history, max_entries)
+
+
+## Resets to the server's last-reported position for this fighter and replays every
+## buffered input since the server's own acknowledgement of it — the input-replay
+## reconciliation #113 replaced independent client/server dead reckoning with. Every
+## replayed tick runs through the same `Movement.step` the server itself steps with, so
+## this can only ever land exactly where the server would have, given the same inputs.
+func _reconcile() -> void:
+	global_position = server_position
+	for entry in inputs_to_replay(_input_history, _server_input_ack):
+		Movement.step(self, entry["direction"], entry["can_move"])
+
+
+## This tick's own sequence number — the one `_record_input` is about to file this tick's
+## direction under. Public so `ArenaClient` can tag the very `submit_input` RPC that
+## carries this same direction with it, which is what lets the server's ack refer back to
+## a specific buffered tick later.
+func current_input_sequence() -> int:
+	return _input_sequence
+
+
+## Which buffered inputs are still unconfirmed after a reconciliation to
+## `acked_sequence`: everything at or before it is already folded into the server's own
+## reported position, so only what comes after needs replaying. Pulled out static, the
+## same convention `movement_direction_toward`/`facing_for` use, so the trim itself is
+## checkable without a scene tree or a fake network round trip.
+static func inputs_to_replay(
+	history: Array[Dictionary], acked_sequence: int
+) -> Array[Dictionary]:
+	var replay: Array[Dictionary] = []
+	for entry in history:
+		if entry["sequence"] > acked_sequence:
+			replay.append(entry)
+	return replay
+
+
+## Keeps only the newest `max_entries` of a buffered input history. Static for the same
+## reason `inputs_to_replay` is — see `INPUT_HISTORY_SECONDS`'s own doc comment for why
+## this bound has to exist at all.
+static func trim_input_history(
+	history: Array[Dictionary], max_entries: int
+) -> Array[Dictionary]:
+	if history.size() <= max_entries:
+		return history
+	return history.slice(history.size() - max_entries, history.size())
+
+
+## Called once per incoming snapshot that names this fighter.
+##
+## For a remote fighter this is the only truth it has — `server_position` simply feeds
+## the lerp in `_apply_server_correction`, unchanged since before #113. For the local
+## player it also arms a reconciliation: the next `_physics_process` resets to `position`
+## and replays every buffered input the server had not yet acknowledged, rather than
+## letting an independent simulation quietly drift from the server's own.
+func receive_server_snapshot(position: Vector2, input_ack: int) -> void:
+	server_position = position
+	if player_controlled:
+		_server_input_ack = input_ack
+		_pending_reconciliation = true
+
+
+## Pulls a remote fighter toward the server's version of where it is. Exponential rather
+## than a raw lerp on delta, so the pull feels the same at any frame rate.
+##
+## Only ever called for a remote fighter now — the local player reconciles by exact
+## replay in `_reconcile` instead, which is what #113 replaced this function's old
+## player-controlled dead-zone branch with.
 func _apply_server_correction(delta: float) -> void:
-	global_position = corrected_position(
-		global_position, server_position, delta, player_controlled
-	)
+	global_position = corrected_position(global_position, server_position, delta)
 	combatant.position = global_position
 
 
-## The reconciliation decision itself, pulled out static so the curve — where the dead
-## zone ends, where a lerp turns into a snap — can be checked without a scene tree.
-##
-## `player_controlled` gets the dead zone below `CORRECTION_THRESHOLD` so honest, bounded
-## lag isn't fought frame to frame; a remote fighter has nothing of its own predicting it,
-## so it tracks every drift, however small. Both lerp at their own rate up to
-## `TELEPORT_THRESHOLD`, past which this stops being a correction — see that constant's
-## own doc comment for why the line sits where it does.
-static func corrected_position(
-	current: Vector2, target: Vector2, delta: float, player_controlled: bool
-) -> Vector2:
+## The remote-fighter reconciliation curve, pulled out static so it can be checked
+## without a scene tree. Every drift is tracked, however small — nobody predicts a
+## remote fighter, so unlike the old local-player branch this has no dead zone to sit
+## still inside. Past `TELEPORT_THRESHOLD` this stops being a correction at all — see
+## that constant's own doc comment for why the line sits where it does.
+static func corrected_position(current: Vector2, target: Vector2, delta: float) -> Vector2:
 	var error := current.distance_to(target)
-
 	if error > TELEPORT_THRESHOLD:
 		return target
-	if not player_controlled:
-		return current.lerp(target, 1.0 - exp(-delta * REMOTE_RATE))
-	if error > CORRECTION_THRESHOLD:
-		return current.lerp(target, 1.0 - exp(-delta * CORRECTION_RATE))
-	return current
+	return current.lerp(target, 1.0 - exp(-delta * REMOTE_RATE))
 
 
 ## Gives this fighter a route-finder to steer with. Injected rather than looked up, the
@@ -409,15 +519,16 @@ static func heading_for(
 ## actually was, where its own prediction (or lack of one) put it, and where it ended
 ## up after any server correction.
 ##
-## A player-controlled fighter's own predicted move is what "walking" means for them —
-## measuring speed after a server correction instead would fold in however fast an
-## active correction is currently pulling them on top of that, which can read as a
-## dead sprint while genuinely standing still. `CORRECTION_THRESHOLD`'s dead zone means
-## this is not a rare edge case: any correction that fires at all starts well above
-## `WALK_SPEED_THRESHOLD`. Before #93 this stayed invisible — casting always showed a
-## dedicated cast pose regardless of speed — but a cast with no art of its own now
-## falls back to whatever WALK/IDLE would show, which is exactly where it surfaced: a
-## stationary, casting, player-controlled fighter reading as walking.
+## A player-controlled fighter's own predicted move is what "walking" means for them.
+## Before #113 this also mattered because measuring speed after a server correction
+## instead would fold in however fast an active lerp was pulling them on top of that,
+## which could read as a dead sprint while genuinely standing still — the local player no
+## longer has a lerp to fold in at all, but the split stays: `_step_local_prediction`'s
+## reconciliation replay is still the local player's own move, not something read back
+## off a blend. Before #93 this stayed invisible — casting always showed a dedicated
+## cast pose regardless of speed — but a cast with no art of its own now falls back to
+## whatever WALK/IDLE would show, which is exactly where it surfaced: a stationary,
+## casting, player-controlled fighter reading as walking.
 ##
 ## A remote fighter has no prediction of its own to measure — the corrected position is
 ## the only signal it has of moving at all, so it keeps using that.

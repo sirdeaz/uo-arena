@@ -14,7 +14,7 @@ class_name ArenaClient
 ## and `autoload/network_manager.gd` is what turns those into packets — which is what
 ## lets all of this be tested without a socket.
 
-signal input_changed(direction: Vector2)
+signal input_changed(direction: Vector2, sequence: int)
 signal cast_requested(spell_id: int, target_peer: int)
 
 ## How near a click has to land to pick somebody. Generous relative to the 18 px body,
@@ -107,7 +107,9 @@ func apply_snapshot(records: Array) -> void:
 			continue
 		var fighter: Fighter = _fighters[peer_id]
 		if NetProtocol.apply_record(record, fighter.combatant):
-			fighter.server_position = fighter.combatant.position
+			fighter.receive_server_snapshot(
+				fighter.combatant.position, NetProtocol.input_ack_of(record)
+			)
 
 
 func apply_cast_event(peer_id: int, event: EntityState.Event, spell_id: int) -> void:
@@ -215,7 +217,7 @@ func _send_input(delta: float) -> void:
 
 	_last_sent_input = direction
 	_seconds_since_input_sent = 0.0
-	input_changed.emit(direction)
+	input_changed.emit(direction, fighter.current_input_sequence())
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -32,6 +32,12 @@ class Player extends RefCounted:
 	var input: Vector2 = Vector2.ZERO
 	var seconds_since_input: float = 0.0
 
+	## The most recent input sequence number this player's own client attached to a
+	## `submit_input` RPC. Echoed back in every snapshot record as `INPUT_ACK` so the
+	## client knows exactly which of its own buffered inputs are already folded into the
+	## position it is being told — see `Fighter.receive_server_snapshot` (#113).
+	var last_input_sequence: int = -1
+
 	## Who the last accepted cast request named.
 	var requested_target: int = 0
 	## Who the spell currently in the air was aimed at when it began.
@@ -146,12 +152,17 @@ func slots() -> PackedInt32Array:
 
 ## Steering. The direction is clamped before it gets here; an unclamped one is a
 ## fifty-times-move-speed hack.
-func set_input(peer_id: int, direction: Vector2) -> void:
+##
+## `sequence` is the client's own input-history tag, taken as-is and simply echoed back
+## in the next snapshot — nothing here trusts it for anything but that round trip, so an
+## out-of-order or replayed value only ever costs the sender their own reconciliation.
+func set_input(peer_id: int, direction: Vector2, sequence: int) -> void:
 	if not _players.has(peer_id):
 		return
 	var player: Player = _players[peer_id]
 	player.input = direction
 	player.seconds_since_input = 0.0
+	player.last_input_sequence = sequence
 
 
 ## Asks to begin a cast. Returns whether it was accepted, which is not the same as the
@@ -227,7 +238,10 @@ func step(delta: float) -> void:
 func build_snapshot() -> Array:
 	var records := []
 	for peer_id in _players:
-		records.append(NetProtocol.encode_combatant(peer_id, _players[peer_id].combatant))
+		var player: Player = _players[peer_id]
+		records.append(
+			NetProtocol.encode_combatant(peer_id, player.combatant, player.last_input_sequence)
+		)
 	return records
 
 
@@ -283,9 +297,7 @@ func _step_movement(player: Player, delta: float) -> void:
 		# until they happen to press the button again.
 		player.input = Vector2.ZERO
 
-	var direction := player.input if player.combatant.can_move() else Vector2.ZERO
-	player.body.velocity = direction * Constants.PLAYER_MOVE_SPEED
-	player.body.move_and_slide()
+	Movement.step(player.body, player.input, player.combatant.can_move())
 	player.combatant.position = player.body.global_position
 
 
