@@ -94,6 +94,36 @@ func test_a_repeated_roster_does_not_rebuild_your_fighter() -> void:
 	assert_eq(_fighter(LOCAL), before, "the same fighter should survive a roster resend")
 
 
+# ── Steering to the server ────────────────────────────────────────────────────────
+
+
+func test_input_is_sent_every_tick_even_while_unchanged() -> void:
+	# #118: a held keyboard direction is bit-identical tick to tick, so a send gated on
+	# "did it change" leans entirely on a sparse heartbeat over an unreliable channel —
+	# one dropped packet then costs a full heartbeat interval of stale server input.
+	# Sending every tick regardless is what gives a lossy channel another chance next
+	# tick, the way continuously-recomputed mouse steering already got for free.
+	_roster([LOCAL])
+	var sends: Array = []
+	client.input_changed.connect(
+		func(direction: Vector2, sequence: int) -> void: sends.append([direction, sequence])
+	)
+
+	for _tick in 5:
+		client._send_input()
+
+	assert_eq(sends.size(), 5, "an unchanging direction must still be resent every tick")
+
+
+func test_no_local_fighter_sends_nothing() -> void:
+	# Before your own roster entry lands there is nothing to steer — this must not
+	# crash reaching for a fighter that is not there yet.
+	var sends: Array = []
+	client.input_changed.connect(func(_direction: Vector2, _sequence: int) -> void: sends.append(1))
+	client._send_input()
+	assert_eq(sends.size(), 0, "no fighter means nothing to say")
+
+
 # ── Snapshots ─────────────────────────────────────────────────────────────────────
 
 

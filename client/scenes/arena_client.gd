@@ -22,10 +22,6 @@ signal cast_requested(spell_id: int, target_peer: int)
 ## occasionally selecting the wrong neighbour.
 const TARGET_PICK_RADIUS: float = 44.0
 
-## Steering is sent on change, plus this often regardless. Input goes unreliably, so the
-## packet that says "I let go of the button" is exactly the one that can go missing.
-const INPUT_HEARTBEAT_SECONDS: float = 0.1
-
 ## A scene rather than `Fighter.new()` so the collision shape, the character's
 ## `SpriteFrames` and the draw layers all come wired from `client/scenes/fighter.tscn`.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
@@ -55,9 +51,6 @@ var local_peer_id: int = 0
 var _fighters: Dictionary = {}
 var _target_peer: int = 0
 var _last_event: String = ""
-
-var _last_sent_input: Vector2 = Vector2.ZERO
-var _seconds_since_input_sent: float = 0.0
 
 
 func _ready() -> void:
@@ -172,8 +165,8 @@ func last_event() -> String:
 # ── What we tell the server ───────────────────────────────────────────────────────
 
 
-func _physics_process(delta: float) -> void:
-	_send_input(delta)
+func _physics_process(_delta: float) -> void:
+	_send_input()
 	_update_aim()
 	_update_camera()
 	_update_hud()
@@ -203,20 +196,27 @@ func _update_aim() -> void:
 		fighter.aim_at(null)
 
 
-func _send_input(delta: float) -> void:
-	_seconds_since_input_sent += delta
-
+## Sent every physics tick, unconditionally — not just on change plus an occasional
+## heartbeat. `submit_input` travels unreliable_ordered, so any single send can simply
+## vanish; sending every tick is what gives the channel another chance next tick rather
+## than waiting out a throttle.
+##
+## That throttle used to cost mouse steering nothing in practice — recomputing toward a
+## live cursor every tick makes the direction differ often enough on its own — but a
+## held keyboard direction is bit-identical tick to tick, so it never tripped "on
+## change" and leaned on the heartbeat alone: one dropped packet meant up to a full
+## heartbeat interval of the server holding a stale direction, and reconciliation
+## catching up to that is what read as keyboard-only skipping (#118). Bandwidth is not
+## a reason to throttle this back — one client's own steering, unlike the snapshot
+## broadcast `SNAPSHOT_HZ` is sized against, is not multiplied by how many players are
+## in the arena.
+func _send_input() -> void:
 	var fighter := _local_fighter()
+	if fighter == null:
+		return
 	# Steering intent is sent raw. Whether it is allowed — paralyzed, dead — is the
 	# server's ruling, and it makes it again on its own side every step.
-	var direction := fighter.input_direction() if fighter != null else Vector2.ZERO
-
-	var changed := not direction.is_equal_approx(_last_sent_input)
-	if not changed and _seconds_since_input_sent < INPUT_HEARTBEAT_SECONDS:
-		return
-
-	_last_sent_input = direction
-	_seconds_since_input_sent = 0.0
+	var direction := fighter.input_direction()
 	input_changed.emit(direction, fighter.current_input_sequence())
 
 
