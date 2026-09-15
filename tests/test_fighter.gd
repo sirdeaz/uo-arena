@@ -285,3 +285,101 @@ func test_a_snapshot_resets_the_local_player_to_the_authoritative_position() -> 
 		"a reconciling local player must land on the server's own position, not ease toward it"
 	)
 	fighter.queue_free()
+
+
+# ── prediction_already_agrees: skipping a needless reset+replay since #122 ──────────
+#
+# Static, so the agreement check itself is checkable the same way `inputs_to_replay` is
+# — no scene tree, no physics tick, no fake network round trip.
+
+
+func test_a_matching_prediction_needs_no_correction() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(10.0, 0.0)},
+	]
+	assert_true(
+		Fighter.prediction_already_agrees(history, 0, Vector2(10.0, 0.0), 0.5),
+		"an exact match has nothing left for a reconciliation to fix"
+	)
+
+
+func test_a_prediction_within_tolerance_needs_no_correction() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(10.0, 0.0)},
+	]
+	assert_true(
+		Fighter.prediction_already_agrees(history, 0, Vector2(10.4, 0.0), 0.5),
+		"floating-point noise inside the tolerance is not a real misprediction"
+	)
+
+
+func test_a_prediction_outside_tolerance_still_needs_correcting() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(10.0, 0.0)},
+	]
+	assert_false(
+		Fighter.prediction_already_agrees(history, 0, Vector2(40.0, 0.0), 0.5),
+		"a real divergence must still be caught, not waved through as noise"
+	)
+
+
+func test_no_stored_prediction_for_the_ack_needs_correcting() -> void:
+	# A stall long enough to trim the acked entry out of history, or an ack from before
+	# anything was ever recorded — either way there is nothing to compare against, so
+	# the safe default is "assume a correction is needed", the same as before #122.
+	var history: Array[Dictionary] = [
+		{"sequence": 5, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(10.0, 0.0)},
+	]
+	assert_false(
+		Fighter.prediction_already_agrees(history, 2, Vector2(10.0, 0.0), 0.5),
+		"no stored prediction to check against must never be read as agreement"
+	)
+	assert_false(
+		Fighter.prediction_already_agrees([], -1, Vector2.ZERO, 0.5),
+		"an empty history has nothing to compare against either"
+	)
+
+
+# ── Reconciliation is skipped when it would be a no-op, since #122 ──────────────────
+
+
+func test_a_snapshot_that_already_matches_prediction_does_not_arm_reconciliation() -> void:
+	var fighter := FIGHTER_SCENE.instantiate()
+	fighter.server_driven = true
+	fighter.player_controlled = true
+	add_child(fighter)
+	fighter.global_position = Vector2(200.0, 100.0)
+
+	# Tick 0: no input pressed in a headless test, so this fighter simply stands still
+	# and records predicted_after = (200, 100) for sequence 0.
+	await get_tree().physics_frame
+
+	fighter.receive_server_snapshot(Vector2(200.0, 100.0), 0)
+	assert_false(
+		fighter.reconciliation_pending(),
+		"an ack the client's own prediction already matches must not trigger a burst reset+replay (#122)"
+	)
+	fighter.queue_free()
+
+
+func test_a_snapshot_that_disagrees_still_arms_and_resolves_reconciliation() -> void:
+	var fighter := FIGHTER_SCENE.instantiate()
+	fighter.server_driven = true
+	fighter.player_controlled = true
+	add_child(fighter)
+	fighter.global_position = Vector2(200.0, 100.0)
+
+	await get_tree().physics_frame
+
+	fighter.receive_server_snapshot(Vector2(400.0, 100.0), 0)
+	assert_true(
+		fighter.reconciliation_pending(),
+		"a real misprediction must still be caught, not skipped as if it were noise"
+	)
+
+	await get_tree().physics_frame
+	assert_true(
+		fighter.global_position.distance_to(Vector2(400.0, 100.0)) < 1.0,
+		"the skip path must never come at the cost of #113's own convergence guarantee"
+	)
+	fighter.queue_free()
