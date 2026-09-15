@@ -68,6 +68,17 @@ const REMOTE_RATE: float = 18.0
 ## reconnects; see #113's own "watch out for" on this exact trap.
 const INPUT_HISTORY_SECONDS: float = 1.0
 
+## How close continuous prediction's own guess has to land to the server's authoritative
+## position, at the tick the server just acknowledged, to count as "no correction
+## needed" — see `prediction_already_agrees`. `Movement.step` is the same deterministic
+## call on both ends given the same inputs, so an honest prediction should land at
+## (near enough) the exact same float the server does; this only has to absorb
+## incidental floating-point noise, not read as a real tolerance for drift the way
+## `MAX_HONEST_DRIFT`/`TELEPORT_THRESHOLD` above do for a remote fighter's network lag.
+## A real misprediction — the server ruling on something the client could not have
+## known yet, like a status effect landing mid-flight — clears this by a wide margin.
+const RECONCILIATION_AGREEMENT_TOLERANCE: float = 0.5
+
 @export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
 
@@ -96,9 +107,11 @@ var server_position: Vector2 = Vector2.ZERO
 ## nothing yet to say any of it is stale.
 var _server_input_ack: int = -1
 
-## True from the moment a snapshot lands for this fighter until the next
+## True from the moment a snapshot lands for this fighter *and* `receive_server_snapshot`
+## could not confirm prediction already agrees with it, until the next
 ## `_physics_process` consumes it. Reconciliation happens on the physics tick, not in the
-## RPC callback, so movement only ever happens where every other tick of it does.
+## RPC callback, so movement only ever happens where every other tick of it does. Most
+## snapshots leave this false — see `prediction_already_agrees` (#122).
 var _pending_reconciliation: bool = false
 
 ## This tick's sequence number, handed to the next one buffered in `_input_history` and
@@ -106,12 +119,16 @@ var _pending_reconciliation: bool = false
 ## direction — see `current_input_sequence`.
 var _input_sequence: int = 0
 
-## `{"sequence": int, "direction": Vector2, "can_move": bool}` dictionaries, oldest
-## first — one per physics tick this fighter has been local and server-driven for, kept
-## only long enough to replay after a reconciliation. `can_move` is recorded per tick
-## rather than read fresh at replay time because the two can genuinely differ: a tick
-## recorded while paralyzed must replay as paralyzed even if the paralysis has since worn
-## off, or the replay silently disagrees with what the server actually ran (#113).
+## `{"sequence": int, "direction": Vector2, "can_move": bool, "predicted_after":
+## Vector2}` dictionaries, oldest first — one per physics tick this fighter has been
+## local and server-driven for, kept only long enough to replay after a reconciliation.
+## `can_move` is recorded per tick rather than read fresh at replay time because the two
+## can genuinely differ: a tick recorded while paralyzed must replay as paralyzed even if
+## the paralysis has since worn off, or the replay silently disagrees with what the
+## server actually ran (#113). `predicted_after` is where continuous prediction (or the
+## last reconciliation that replayed this same entry) put this fighter right after that
+## tick's own step — `prediction_already_agrees` reads it back against a later snapshot
+## so an already-correct prediction never has to be recomputed by force (#122).
 var _input_history: Array[Dictionary] = []
 
 ## Off by default. Getting yourself around cover is the skill this game is about, so this
@@ -225,7 +242,14 @@ func _physics_process(delta: float) -> void:
 	var predicted_at: Vector2
 
 	if server_driven and player_controlled:
-		predicted_at = _step_local_prediction(direction)
+		var step := _step_local_prediction(direction)
+		# A reconciling tick can fold several buffered ticks into this one call (#122)
+		# — `was_at` gets overridden here to the position just before *this* tick's own
+		# step specifically, so speed and facing below are never judged on a whole
+		# replayed batch at once. A non-reconciling tick's `from` is just `was_at`
+		# unchanged, so this is a no-op on the common path.
+		was_at = step["from"]
+		predicted_at = step["to"]
 	else:
 		Movement.step(self, direction, combatant.can_move())
 		predicted_at = global_position
@@ -256,26 +280,40 @@ func _physics_process(delta: float) -> void:
 ## reconcile first and let that replay carry this tick along as its final entry.
 ##
 ## Reconciliation is not a separate move on top of the regular step — it replaces it for
-## this one tick, which is what `_reconcile` returning the position it ends at (rather
-## than this function running `Movement.step` again afterwards) guarantees.
-func _step_local_prediction(direction: Vector2) -> Vector2:
+## this one tick. Returns `{"from": Vector2, "to": Vector2}` rather than just the ending
+## position: on a plain tick that is simply before/after this one step, but a
+## reconciliation can fold several buffered ticks into a single call (#122), and callers
+## judging speed or facing need to know where *this tick's own* movement started, not
+## wherever the whole replayed batch began.
+func _step_local_prediction(direction: Vector2) -> Dictionary:
 	_record_input(direction)
 	if _pending_reconciliation:
 		_pending_reconciliation = false
-		_reconcile()
-	else:
-		Movement.step(self, direction, combatant.can_move())
-	return global_position
+		return _reconcile()
+	var start := global_position
+	Movement.step(self, direction, combatant.can_move())
+	# The entry `_record_input` just appended only knows the placeholder position from
+	# before this step ran — fill in the real answer now that it has, the same as
+	# `_reconcile` does for every entry it replays.
+	_input_history[_input_history.size() - 1]["predicted_after"] = global_position
+	return {"from": start, "to": global_position}
 
 
 ## Buffers this tick's input, tagged with a once-per-tick sequence number, for
 ## `_reconcile` to replay later. Trimmed to `INPUT_HISTORY_SECONDS` worth of ticks — see
 ## that constant's own doc comment for why the bound exists at all.
+##
+## `predicted_after` is filled in with wherever this tick happens to be positioned right
+## now — before this tick's own step has actually run — and is always overwritten with
+## the real answer immediately after, by whichever of `_step_local_prediction`'s two
+## branches ends up stepping this same entry. It only exists as a placeholder so the
+## dictionary shape is right from the moment the entry is appended.
 func _record_input(direction: Vector2) -> void:
 	_input_history.append({
 		"sequence": _input_sequence,
 		"direction": direction,
 		"can_move": combatant.can_move(),
+		"predicted_after": global_position,
 	})
 	_input_sequence += 1
 
@@ -288,10 +326,25 @@ func _record_input(direction: Vector2) -> void:
 ## reconciliation #113 replaced independent client/server dead reckoning with. Every
 ## replayed tick runs through the same `Movement.step` the server itself steps with, so
 ## this can only ever land exactly where the server would have, given the same inputs.
-func _reconcile() -> void:
+##
+## Only reached when `receive_server_snapshot` could not confirm prediction already
+## agrees with the server (see `prediction_already_agrees`), so this is the rarer, real
+## correction — not something every snapshot triggers. Each replayed entry's own
+## `predicted_after` is refreshed as it is stepped, so a later ack can compare against
+## this freshly-corrected trajectory instead of a stale pre-correction guess. Returns
+## `{"from": Vector2, "to": Vector2}` bracketing only the *last* entry's own step — see
+## `_step_local_prediction`'s own doc comment for why that split matters.
+func _reconcile() -> Dictionary:
 	global_position = server_position
-	for entry in inputs_to_replay(_input_history, _server_input_ack):
+	var replay := inputs_to_replay(_input_history, _server_input_ack)
+	var last_step_start := global_position
+	for i in replay.size():
+		var entry: Dictionary = replay[i]
+		if i == replay.size() - 1:
+			last_step_start = global_position
 		Movement.step(self, entry["direction"], entry["can_move"])
+		entry["predicted_after"] = global_position
+	return {"from": last_step_start, "to": global_position}
 
 
 ## This tick's own sequence number — the one `_record_input` is about to file this tick's
@@ -300,6 +353,14 @@ func _reconcile() -> void:
 ## a specific buffered tick later.
 func current_input_sequence() -> int:
 	return _input_sequence
+
+
+## Whether the next `_physics_process` will reset and replay rather than take a plain
+## step. Public so a test can tell the two apart without waiting a frame to see whether
+## `global_position` moved — see `prediction_already_agrees` for why most snapshots now
+## leave this false (#122).
+func reconciliation_pending() -> bool:
+	return _pending_reconciliation
 
 
 ## Which buffered inputs are still unconfirmed after a reconciliation to
@@ -317,6 +378,37 @@ static func inputs_to_replay(
 	return replay
 
 
+## Whether continuous prediction's own guess at `acked_sequence` already lands within
+## `tolerance` of `authoritative_position`. If so, a reconciliation has nothing to fix —
+## replaying every buffered input since then would only reconstruct a trajectory
+## prediction has already walked through tick by tick, at the cost of folding all of it
+## into whichever single physics tick the snapshot happens to land on (#122). That fold
+## is what read as the local player gliding and, independently, fed `facing_for` a whole
+## batch of steering at once instead of one tick's worth.
+##
+## Confirmed to be mouse-specific in practice: held WASD directions are bit-identical
+## tick to tick, so folding several of them into one replayed burst still produces one
+## clean straight step — nothing for a tie-break to trip over. `steering_direction_toward`
+## recomputes toward the live cursor every tick, so several of *those* compressed into
+## one burst are genuinely different samples blended together. Also only visible under
+## real latency, where several ticks go unacked between snapshots — which is exactly why
+## it never showed up testing against a local, zero-latency server.
+##
+## `false` — "a correction is needed" — is the safe default: with nothing recorded for
+## `acked_sequence` (a stall trimmed it out of `history`, or nothing has ever been
+## acked), there is nothing to compare against, so this never claims agreement it can't
+## show.
+static func prediction_already_agrees(
+	history: Array[Dictionary], acked_sequence: int, authoritative_position: Vector2,
+	tolerance: float
+) -> bool:
+	for entry in history:
+		if entry["sequence"] == acked_sequence:
+			var predicted: Vector2 = entry["predicted_after"]
+			return predicted.distance_to(authoritative_position) <= tolerance
+	return false
+
+
 ## Keeps only the newest `max_entries` of a buffered input history. Static for the same
 ## reason `inputs_to_replay` is — see `INPUT_HISTORY_SECONDS`'s own doc comment for why
 ## this bound has to exist at all.
@@ -332,14 +424,18 @@ static func trim_input_history(
 ##
 ## For a remote fighter this is the only truth it has — `server_position` simply feeds
 ## the lerp in `_apply_server_correction`, unchanged since before #113. For the local
-## player it also arms a reconciliation: the next `_physics_process` resets to `position`
-## and replays every buffered input the server had not yet acknowledged, rather than
-## letting an independent simulation quietly drift from the server's own.
+## player it also arms a reconciliation — unless `prediction_already_agrees` finds that
+## continuous prediction already landed within `RECONCILIATION_AGREEMENT_TOLERANCE` of
+## where the server itself says this same acked tick ended up, in which case there is
+## nothing this snapshot needs corrected and the next `_physics_process` steps on
+## exactly as if it had never arrived (#122).
 func receive_server_snapshot(position: Vector2, input_ack: int) -> void:
 	server_position = position
 	if player_controlled:
+		_pending_reconciliation = not prediction_already_agrees(
+			_input_history, input_ack, position, RECONCILIATION_AGREEMENT_TOLERANCE
+		)
 		_server_input_ack = input_ack
-		_pending_reconciliation = true
 
 
 ## Pulls a remote fighter toward the server's version of where it is. Exponential rather
