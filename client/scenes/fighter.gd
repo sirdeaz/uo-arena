@@ -481,15 +481,43 @@ const WALK_SPEED_THRESHOLD: float = 12.0
 ## tent, sliding a fraction of a pixel a frame, spins on the spot.
 const FACING_EPSILON: float = 0.5
 
+## Once movement has settled on the horizontal axis, how far the vertical component
+## must clearly overtake it before facing flips back — as a fraction of the vertical
+## component itself, so it scales with however fast the fighter is moving.
+##
+## Steering toward a cursor (and #113/#114's reconciliation replay, which can run
+## several `move_and_slide()` calls back to back in one frame) puts small, real
+## tick-to-tick noise into the *realized* displacement `_update_facing` reads — most
+## visibly moving up across the east-west duel lane, where the input direction sits
+## right on the horizontal/vertical tie below and a player rarely walks purely north
+## through it without also strafing. Without this, that noise alone flips the tie on
+## nearly every tick (#120). Applied only when leaving horizontal, not when entering
+## it, so a genuine diagonal still ties to horizontal on the very first tick — see
+## that rule below.
+const FACING_AXIS_HYSTERESIS: float = 0.2
+
 ## Which heading `direction` points at, or `previous` when it points nowhere.
 ##
 ## Ties go to the horizontal. A player walking exactly diagonally is drawn facing along
 ## the duel lane rather than up or down it, which is the read that matters: the lane is
 ## east-west and so is almost every shot fired down it.
+##
+## That tie-break alone is only stable frame to frame once a heading has already
+## settled — see `FACING_AXIS_HYSTERESIS` — so a fighter already reading as
+## horizontal keeps reading that way through a noisy tick that would otherwise sit
+## right on the boundary, rather than re-deciding fresh off a bare `absf` comparison
+## every tick.
 static func facing_for(direction: Vector2, previous: Facing) -> Facing:
 	if direction.length() < FACING_EPSILON:
 		return previous
-	if absf(direction.x) >= absf(direction.y):
+	var across := absf(direction.x)
+	var along := absf(direction.y)
+	var was_horizontal := previous == Facing.RIGHT or previous == Facing.LEFT
+	var stays_horizontal := (
+		across >= along * (1.0 - FACING_AXIS_HYSTERESIS) if was_horizontal
+		else across >= along
+	)
+	if stays_horizontal:
 		return Facing.RIGHT if direction.x > 0.0 else Facing.LEFT
 	# Godot's y grows downward, so a positive y is toward the bottom of the screen.
 	return Facing.DOWN if direction.y > 0.0 else Facing.UP

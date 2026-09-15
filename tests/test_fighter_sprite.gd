@@ -70,6 +70,60 @@ func test_a_diagonal_is_drawn_along_the_lane() -> void:
 	)
 
 
+func test_a_noisy_tick_does_not_flip_a_settled_horizontal_facing() -> void:
+	# Already reading RIGHT off a walk that leans horizontal; a single tick where the
+	# vertical component ticks slightly ahead must not be read as a turn — this is the
+	# near-diagonal noise reported moving up across the duel lane (#120).
+	assert_eq(
+		Fighter.facing_for(Vector2(29, 30), RIGHT), RIGHT,
+		"a hair of vertical lead must not flip a facing that already reads horizontal"
+	)
+	assert_eq(
+		Fighter.facing_for(Vector2(-29, 30), LEFT), LEFT, "and the same mirrored"
+	)
+
+
+func test_a_clear_vertical_move_still_turns_a_settled_horizontal_facing() -> void:
+	# Hysteresis dampens noise, it does not pin the facing in place — a real turn still
+	# reads as one once the vertical component clearly overtakes the horizontal.
+	assert_eq(
+		Fighter.facing_for(Vector2(10, -30), RIGHT), UP,
+		"a genuinely vertical move must still turn a facing that was reading horizontal"
+	)
+
+
+func test_a_rotating_input_crosses_the_tie_only_once() -> void:
+	# A slow rotation from vertical toward horizontal, jittered right around the
+	# x≈y boundary the way real per-tick movement noise is (#120). Ticks 3 and 5-6
+	# straddle the exact tie line in both directions; without hysteresis every one of
+	# them would flip the facing, since each is judged fresh off a bare `absf`
+	# comparison. With it, only the one genuine crossing (tick 4) should count.
+	# Negative y is "up" (Godot's y grows downward) — a walk that starts vertical and
+	# rotates toward horizontal, same as the reported "moving up across the lane" case.
+	var ticks: Array[Vector2] = [
+		Vector2(10, -40),  # clearly vertical
+		Vector2(20, -40),  # clearly vertical
+		Vector2(30, -32),  # noise: just past vertical again, still no lock yet
+		Vector2(33, -30),  # the real crossing — across finally, clearly leads
+		Vector2(30, -33),  # noise: dips back past the tie line — must not flip back
+		Vector2(28, -34),  # noise: dips further — still within the hysteresis margin
+		Vector2(35, -20),  # settling into a genuine horizontal move
+		Vector2(40, -10),  # clearly horizontal
+	]
+	var expected_flip_at := 3 # index of Vector2(33, -30) above
+
+	var facing := UP
+	var flips := 0
+	for i in ticks.size():
+		var next := Fighter.facing_for(ticks[i], facing)
+		if next != facing:
+			flips += 1
+			assert_eq(i, expected_flip_at, "the only flip must be the real crossing, not a noisy tick either side of it")
+			facing = next
+	assert_eq(flips, 1, "a noisy sweep across the tie line should settle the facing once")
+	assert_eq(facing, RIGHT, "and land on the axis the sweep actually ended on")
+
+
 # ── Heading, once aim is in the picture ───────────────────────────────────────────
 
 
