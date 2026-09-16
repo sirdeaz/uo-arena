@@ -14,6 +14,15 @@ extends TestCase
 ## So this one drives the body the way `_physics_process` does — ask `Fighter`, set
 ## `velocity`, `move_and_slide` — and reads the collisions the engine reports rather than
 ## a re-implementation of them.
+##
+## Runs against `tests/fixtures/mechanics_arena.tscn` (#123), not the real, evolving
+## `arena_map.tscn` — see that file's own header comment for why, and for the fixture's
+## exact geometry (two 128x128 tents, mirrored north/south of the origin). The named
+## walks below (`test_the_walk_from_the_issue_...`) used to pin issue #28's own reported
+## coordinates against the real arena; they now walk an equivalent corner of the fixture
+## instead, since #28's exact pixels stopped meaning anything the moment the real arena
+## was repainted. The generic sweep (`_crossings`) needed no changes at all — it already
+## derived its cases from whatever `obstacle_polygons()` returns.
 
 ## What a player covers in one physics tick at the pinned rate.
 const STEP: float = Constants.PLAYER_MOVE_SPEED / 60.0
@@ -21,6 +30,14 @@ const STEP: float = Constants.PLAYER_MOVE_SPEED / 60.0
 ## Ten seconds. Over a 1500-walk sweep of the arena the longest walk that genuinely
 ## arrives takes six, so anything still going at this point is going in circles.
 const PATIENCE_TICKS: int = 600
+
+## A start/cursor pair that has to round exactly one corner of the fixture's north tent
+## (x:[-64,64], y:[-256,-128]) — east and south of it, aiming for a point west and north
+## of it. Issue #28's own reported coordinates lived here before the real arena moved and
+## took their meaning with it; the regression they guard — a route that settles into a
+## short cycle instead of arriving — needs some corner to round, not those exact pixels.
+const ROUNDING_START := Vector2(100.0, -40.0)
+const ROUNDING_CURSOR := Vector2(-100.0, -320.0)
 
 ## The authored fighter scene — its collision shape lives here now, not in `_ready`, so a
 ## bare `Fighter.new()` would slide straight through every tent.
@@ -36,7 +53,7 @@ var _no_go: Array[PackedVector2Array] = []
 
 
 func before_each() -> void:
-	_map = load("res://arena/arena_map.tscn").instantiate()
+	_map = load("res://tests/fixtures/mechanics_arena.tscn").instantiate()
 	add_child(_map)
 	# The arena is collided by `TileMapLayer` tiles now, and their physics bodies are
 	# built on the first physics step — not synchronously on `add_child` the way the old
@@ -112,14 +129,13 @@ func _hold_toward(from: Vector2, cursor: Vector2, ticks: int = PATIENCE_TICKS) -
 
 
 func test_the_walk_from_the_issue_arrives_instead_of_parking_on_the_corner() -> void:
-	# Issue #28's own case. The route is [(122, -63), (122, -217), (0, -240)] and the
-	# first waypoint is the north tent's inflated south-east corner. Before the fix this
-	# settled into a seven-tick cycle at about (107, -68) and stayed there for as long as
-	# the button was held — 400 ticks in, still 202px from the cursor.
-	var walk := _hold_toward(Vector2(40.0, -40.0), Vector2(0.0, -240.0))
+	# Issue #28's own regression: before the fix, a route with a corner to round could
+	# settle into a short cycle a few pixels wide and stay there for as long as the
+	# button was held, never actually closing the distance to the cursor.
+	var walk := _hold_toward(ROUNDING_START, ROUNDING_CURSOR)
 	assert_true(
 		walk.arrived,
-		"held toward (0, -240) the body parked at %s instead of arriving" % walk.parked_at
+		"held toward %s the body parked at %s instead of arriving" % [ROUNDING_CURSOR, walk.parked_at]
 	)
 
 
@@ -127,7 +143,7 @@ func test_that_walk_never_steers_into_the_tent_it_is_rounding() -> void:
 	# Arriving eventually is not enough. Every tick the assist falls back to the straight
 	# line is a tick spent walking at the tent, and the flip-flop goes on the wire — the
 	# same direction `ArenaClient` sends the server — so everyone watching sees the shuffle.
-	var walk := _hold_toward(Vector2(40.0, -40.0), Vector2(0.0, -240.0))
+	var walk := _hold_toward(ROUNDING_START, ROUNDING_CURSOR)
 	assert_eq(
 		walk.gave_up_ticks,
 		0,
@@ -136,11 +152,11 @@ func test_that_walk_never_steers_into_the_tent_it_is_rounding() -> void:
 
 
 func test_that_walk_is_no_slower_than_holding_the_button_with_the_assist_off() -> void:
-	# The assist is meant to be free. Issue #28's worst case was a walk that finished in
-	# 3.5s unassisted and never finished at all with the assist on.
-	var assisted := _hold_toward(Vector2(40.0, -40.0), Vector2(0.0, -240.0))
+	# The assist is meant to be free. Issue #28's worst case was a walk that finished
+	# unassisted but never finished at all with the assist on.
+	var assisted := _hold_toward(ROUNDING_START, ROUNDING_CURSOR)
 	_fighter.pathfinding_enabled = false
-	var manual := _hold_toward(Vector2(40.0, -40.0), Vector2(0.0, -240.0))
+	var manual := _hold_toward(ROUNDING_START, ROUNDING_CURSOR)
 
 	assert_true(assisted.arrived, "the assisted walk has to arrive at all")
 	if manual.arrived:
@@ -294,7 +310,7 @@ func test_with_the_assist_off_the_body_still_slides_along_the_tent() -> void:
 	# behind a tent walks you into the tent. Getting yourself out of that is the skill the
 	# assist is optional for, and this test is what says the fix did not quietly change it.
 	_fighter.pathfinding_enabled = false
-	var walk := _hold_toward(Vector2(40.0, -40.0), Vector2(0.0, -240.0))
+	var walk := _hold_toward(ROUNDING_START, ROUNDING_CURSOR)
 	assert_true(
 		walk.contact_ticks > 0,
 		"manual steering at a blocked cursor should still put you against the cover"

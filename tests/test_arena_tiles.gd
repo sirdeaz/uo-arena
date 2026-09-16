@@ -8,8 +8,12 @@ extends TestCase
 ##    yet still reads as floor — cover you walk through and are shot past;
 ##  - a half-mirrored paint hands one spawn the better cover.
 ##
-## `ArenaMap.obstacle_polygons()` lifts the routing shapes off those same tiles, so it
-## is checked here to cover exactly the painted cells and no more.
+## `ArenaMap.obstacle_polygons()`'s own area-conservation property — that it covers
+## exactly the painted cells and no more — is a fact about the algorithm, not about this
+## paint specifically, so it moved to `tests/test_path_finder.gd` against the stable
+## mechanics fixture instead (#123): real cover keeps evolving, and pinning an algorithm
+## check to it broke on every repaint for reasons that had nothing to do with the
+## algorithm.
 
 var map: ArenaMap
 var walls: TileMapLayer
@@ -46,15 +50,6 @@ func _cells_in(layer: TileMapLayer, rect: Rect2) -> Array:
 	for y in range(lo.y, hi.y):
 		for x in range(lo.x, hi.x):
 			cells.append(Vector2i(x, y))
-	return cells
-
-
-func _solid_cells() -> Dictionary:
-	var cells := {}
-	for layer: TileMapLayer in [walls, cover]:
-		for cell in layer.get_used_cells():
-			if _has_collision(layer, cell):
-				cells[cell] = true
 	return cells
 
 
@@ -99,22 +94,14 @@ func test_no_tile_in_an_obstacle_layer_is_missing_its_collision() -> void:
 			)
 
 
-func test_obstacle_polygons_cover_exactly_the_painted_cells() -> void:
-	# `obstacle_polygons()` is the pathfinder's whole view of the arena. If it drops a
-	# cell the routing graph has a hole in it; if it invents area, a phantom wall.
-	var cell_area := float(walls.tile_set.tile_size.x * walls.tile_set.tile_size.y)
-	var expected := float(_solid_cells().size()) * cell_area
-
-	var total := 0.0
-	for polygon in map.obstacle_polygons():
-		assert_true(polygon.size() >= 3, "obstacle polygon %s has no area" % polygon)
-		total += absf(_polygon_area(polygon))
-
-	assert_almost_eq(
-		total, expected,
-		"the obstacle polygons cover a different area than the painted cells", 1.0
-	)
-	# And every painted cell's centre sits inside one of them.
+## The exact-area half of this used to live here too — `total area == painted cells ×
+## cell area` — but that assumes every tile's collision fills exactly its own cell,
+## which the widened tree-canopy collision (#111) deliberately no longer does. That half
+## moved to `tests/test_path_finder.gd` against the stable mechanics fixture, where the
+## assumption holds by construction (#123). This half is still a fact about the real
+## paint, so it stays: nothing painted with collision may fall through a gap in the
+## routing graph, however oddly its polygon is shaped.
+func test_no_painted_cell_is_missing_from_the_routing_graph() -> void:
 	for layer: TileMapLayer in [walls, cover]:
 		for cell in layer.get_used_cells():
 			if not _has_collision(layer, cell):
@@ -126,15 +113,6 @@ func test_obstacle_polygons_cover_exactly_the_painted_cells() -> void:
 					inside = true
 					break
 			assert_true(inside, "painted cell at %s is in no obstacle polygon" % centre)
-
-
-func _polygon_area(polygon: PackedVector2Array) -> float:
-	var area := 0.0
-	for i in polygon.size():
-		var a := polygon[i]
-		var b := polygon[(i + 1) % polygon.size()]
-		area += a.x * b.y - b.x * a.y
-	return area * 0.5
 
 
 func test_the_arena_scene_carries_no_rendering_into_the_server_build() -> void:
