@@ -5,15 +5,29 @@ extends TestCase
 ## at once: inflate too little and a path clips a tent corner, inflate too much and a gap
 ## the player really fits through is sealed and the arena quietly falls apart.
 ##
-## These run against the real `arena_map.tscn`, so the numbers below are the arena's own.
+## These run against `tests/fixtures/mechanics_arena.tscn` (#123), not the real, evolving
+## `arena_map.tscn` — a mechanic like inflation or corner-rounding should hold regardless
+## of whatever the shipped arena's art currently looks like, and pinning these numbers to
+## real hand-painted cover meant every repaint broke them for reasons that had nothing to
+## do with the mechanic itself. The fixture is two plain 128×128 squares, exact mirrors of
+## each other through the origin: the "north tent" spans x:[-64,64], y:[-256,-128], the
+## "south tent" x:[-64,64], y:[128,256] — chosen for round numbers, not to resemble the
+## real arena.
 
 const CLEARANCE: float = Constants.PLAYER_RADIUS + PathFinder.CLEARANCE_MARGIN
 
-## A horizontal line close to the spawn line, clear of every cover piece. The blocked
-## counterpart is read off the arena at test time — see `_a_horizontal_line_that_clips_cover`.
+## The fixture's own geometry — see the header above. Named so the tests below read as
+## "the tent's edge", not a repeated magic number.
+const NORTH_TENT_SOUTH_EDGE: float = -128.0
+const NORTH_TENT_EAST_EDGE: float = 64.0
+
+## A horizontal line close to the spawn line, clear of both tents. The blocked
+## counterpart is read off the fixture at test time — see `_a_horizontal_line_that_clips_cover`.
 const LANE_CLEAR_Y: float = 60.0
 
-## The narrowest real gap the clearance margin has to fit through, with room to spare.
+## The narrowest gap the clearance margin has to fit through in the real, shipped arena,
+## with room to spare — a tripwire independent of the fixture below, since it is about
+## whether `CLEARANCE_MARGIN` itself is configured safely, not about routing mechanics.
 const NARROWEST_GAP: float = 95.0
 
 var map: ArenaMap
@@ -21,7 +35,7 @@ var finder: PathFinder
 
 
 func before_each() -> void:
-	map = load("res://arena/arena_map.tscn").instantiate()
+	map = load("res://tests/fixtures/mechanics_arena.tscn").instantiate()
 	add_child(map)
 	finder = PathFinder.new()
 	finder.build(map)
@@ -105,8 +119,10 @@ func test_a_segment_across_the_middle_is_blocked() -> void:
 
 func test_a_line_that_grazes_a_tent_is_blocked_once_the_body_is_accounted_for() -> void:
 	# This is the whole point of inflating. A ray is a zero-width line, so it calls this
-	# clear; an eighteen-pixel body clips the corner.
-	var just_past := 100.0 + Constants.PLAYER_RADIUS * 0.5
+	# clear — the north tent's raw east edge sits at x=64, and `just_past` is outside
+	# that — but an eighteen-pixel body clips the corner well before x=86, where the
+	# inflated edge actually sits.
+	var just_past := NORTH_TENT_EAST_EDGE + Constants.PLAYER_RADIUS * 0.5
 	assert_false(
 		finder.segment_is_walkable(Vector2(just_past, -300.0), Vector2(just_past, 0.0)),
 		"passing within half a body width of a tent corner is not walkable"
@@ -143,6 +159,34 @@ func test_every_solid_thing_in_the_arena_becomes_an_obstacle() -> void:
 					seen = true
 					break
 			assert_true(seen, "painted cell at %s reached no obstacle polygon" % centre)
+
+
+## Moved from `tests/test_arena_tiles.gd` (#123): this is `obstacle_polygons()`'s own
+## area-conservation property, true for any painted layout with tiles whose collision
+## fills exactly their own cell — it is not a fact about the real arena's specific paint,
+## so it belongs here against the fixture, not against content that keeps moving.
+func test_obstacle_polygons_cover_exactly_the_painted_cells() -> void:
+	var walls: TileMapLayer = map.get_node("Walls")
+	var cover: TileMapLayer = map.get_node("Cover")
+	var cell_area := float(walls.tile_set.tile_size.x * walls.tile_set.tile_size.y)
+
+	var solid_cells := 0
+	for layer: TileMapLayer in [walls, cover]:
+		for cell in layer.get_used_cells():
+			var data := layer.get_cell_tile_data(cell)
+			if data != null and data.get_collision_polygons_count(0) > 0:
+				solid_cells += 1
+	var expected := float(solid_cells) * cell_area
+
+	var total := 0.0
+	for polygon in PathFinder.obstacle_polygons(map):
+		assert_true(polygon.size() >= 3, "obstacle polygon %s has no area" % polygon)
+		total += absf(PathFinder.polygon_area(polygon))
+
+	assert_almost_eq(
+		total, expected,
+		"the obstacle polygons cover a different area than the painted cells", 1.0
+	)
 
 
 func test_the_duel_lane_is_walkable_straight_down_the_middle() -> void:
@@ -253,7 +297,9 @@ func test_the_same_question_gives_the_same_answer() -> void:
 func test_standing_against_a_tent_can_still_find_a_route() -> void:
 	# Clearance is wider than the tent, so touching one puts you inside its zone. A route
 	# that refused to start there would switch the assist off exactly where it is wanted.
-	var hugging := Vector2(0.0, -85.0 - Constants.PLAYER_RADIUS)
+	# One pixel north of the tent's own south edge: not actually inside the solid tile,
+	# but well inside the inflated clearance around it.
+	var hugging := Vector2(0.0, NORTH_TENT_SOUTH_EDGE + 1.0)
 	var path := finder.find_path(hugging, Vector2(0.0, 300.0))
 	assert_false(path.is_empty(), "a route out of a tent's clearance zone must exist")
 

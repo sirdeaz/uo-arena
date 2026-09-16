@@ -8,6 +8,10 @@ extends TestCase
 ## The walking tests below are a plain kinematic simulation — no physics server, no
 ## rendering — which is the whole reason this was built out of geometry rather than a
 ## navigation mesh.
+##
+## Runs against `tests/fixtures/mechanics_arena.tscn` (#123), not the real, evolving
+## `arena_map.tscn` — see that file's own header comment for why, and for the fixture's
+## exact geometry (two 128x128 tents, mirrored north/south of the origin).
 
 ## What a player covers in one physics tick at the pinned rate.
 const STEP: float = Constants.PLAYER_MOVE_SPEED / 60.0
@@ -21,7 +25,7 @@ var steering: PathSteering
 
 
 func before_each() -> void:
-	map = load("res://arena/arena_map.tscn").instantiate()
+	map = load("res://tests/fixtures/mechanics_arena.tscn").instantiate()
 	add_child(map)
 	finder = PathFinder.new()
 	finder.build(map)

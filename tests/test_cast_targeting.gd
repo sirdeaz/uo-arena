@@ -14,7 +14,11 @@ var server: ArenaServer
 
 
 func before_each() -> void:
-	server = preload("res://server/arena_server.tscn").instantiate()
+	# The stable mechanics fixture (#123), not the real arena_server.tscn — targeting is
+	# tested against known, fixed cover, not whatever the real arena's art currently
+	# looks like. The tents referenced below are `tests/fixtures/mechanics_arena.tscn`'s
+	# own: two squares at x:[-64,64], y:[-256,-128] (north) and y:[128,256] (south).
+	server = preload("res://tests/fixtures/test_arena_server.tscn").instantiate()
 	add_child(server)
 
 
