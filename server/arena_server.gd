@@ -45,6 +45,11 @@ class Player extends RefCounted:
 
 	var respawn_countdown: float = 0.0
 
+	## `_within_request_budget`'s own bookkeeping — a 1-second rolling window on how many
+	## cast requests this player has made. `request_window` is ticked in
+	## `_step_cast_budget`; without that tick it never reaches 1.0, `cast_requests` never
+	## resets, and a player who has ever made `MAX_CAST_REQUESTS_PER_SECOND` requests in
+	## their whole session is refused every cast after, silently (#127).
 	var cast_requests: int = 0
 	var request_window: float = 0.0
 
@@ -219,6 +224,7 @@ func request_cast(peer_id: int, spell_id: int, target_peer: int) -> bool:
 func step(delta: float) -> void:
 	for peer_id in _players:
 		_step_movement(_players[peer_id], delta)
+		_step_cast_budget(_players[peer_id], delta)
 
 	# Rules second, and in their own pass: resolving a cast can kill someone, and
 	# everyone should have finished moving before anyone's spell lands.
@@ -299,6 +305,13 @@ func _step_movement(player: Player, delta: float) -> void:
 
 	Movement.step(player.body, player.input, player.combatant.can_move())
 	player.combatant.position = player.body.global_position
+
+
+## Ticks `_within_request_budget`'s rolling window. Its own doc comment explains why the
+## budget exists; this is the tick that makes it a *rolling* one second rather than a
+## ceiling for the whole session (#127).
+func _step_cast_budget(player: Player, delta: float) -> void:
+	player.request_window += delta
 
 
 func _step_respawn(player: Player, delta: float) -> void:
