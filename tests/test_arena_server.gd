@@ -115,6 +115,138 @@ func test_leaving_removes_the_player() -> void:
 	assert_eq(server.combatant_of(2), null, "and takes its combatant with it")
 
 
+# ── Input buffering: bounded catch-up, since #139 ───────────────────────────────────
+#
+# #132: `set_input` used to write straight into `player.input`, so however many
+# `submit_input` packets a burst of ordinary jitter delivered between two physics
+# steps, only the last one ever actually got simulated. #134 fixed that with an
+# unbounded-feeling queue (bounded only by `INPUT_TIMEOUT_SECONDS`, 30 ticks) and was
+# reverted (#137) after a live test showed the backlog routinely growing that large,
+# turning into a chronic half-second lag — worse than the bug it fixed. These pin the
+# narrower fix: a small cluster still gets each entry its own tick, in order, but a
+# burst bigger than `MAX_QUEUED_INPUTS` can never make the server fall behind by more
+# than that many ticks, however large the burst actually was.
+
+
+func test_a_burst_of_input_is_drained_one_tick_at_a_time_not_collapsed() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	# Two packets landing before this player's next physics step at all — the exact
+	# jitter-bunching #132 diagnosed, well within the bounded cap.
+	server.set_input(2, Vector2.RIGHT, 0)
+	server.set_input(2, Vector2.UP, 1)
+
+	server.step(1.0 / 60.0)
+	var after_first := server.combatant_of(2).position
+	assert_true(after_first.x > 0.0, "the oldest queued direction must still get its own tick")
+	assert_almost_eq(
+		after_first.y, 0.0, "not blended with or skipped in favour of the newer arrival", 0.01
+	)
+
+	server.step(1.0 / 60.0)
+	var after_second := server.combatant_of(2).position
+	assert_true(
+		after_second.y < after_first.y,
+		"the newer queued direction gets its own following tick too, not lost"
+	)
+
+
+func test_the_ack_reflects_the_entry_actually_stepped_not_the_latest_arrival() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	server.set_input(2, Vector2.RIGHT, 5)
+	server.set_input(2, Vector2.UP, 6)
+
+	server.step(1.0 / 60.0)
+	var record: Array = server.build_snapshot()[0]
+	assert_eq(
+		NetProtocol.input_ack_of(record), 5,
+		"only sequence 5 has actually been simulated so far, even though 6 already arrived"
+	)
+
+
+func test_a_burst_larger_than_the_cap_only_keeps_the_newest_entries() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	# Far more than MAX_QUEUED_INPUTS packets landing before this player's next physics
+	# step at all — #134's own failure mode. A burst this large must never be queued in
+	# full and patiently drained; the oldest entries have to already be gone.
+	var burst_size := 20
+	for sequence in burst_size:
+		server.set_input(2, Vector2.RIGHT, sequence)
+
+	server.step(1.0 / 60.0)
+	var record: Array = server.build_snapshot()[0]
+	assert_eq(
+		NetProtocol.input_ack_of(record),
+		burst_size - ArenaServer.MAX_QUEUED_INPUTS,
+		"only the newest MAX_QUEUED_INPUTS entries of an oversized burst survive to be stepped"
+	)
+
+
+func test_a_burst_larger_than_the_cap_still_catches_up_within_the_cap_worth_of_ticks() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	var burst_size := 20
+	for sequence in burst_size:
+		server.set_input(2, Vector2.RIGHT, sequence)
+
+	for _tick in ArenaServer.MAX_QUEUED_INPUTS:
+		server.step(1.0 / 60.0)
+
+	var record: Array = server.build_snapshot()[0]
+	assert_eq(
+		NetProtocol.input_ack_of(record),
+		burst_size - 1,
+		"draining the bounded backlog must catch all the way up to the latest arrival " +
+		"within MAX_QUEUED_INPUTS ticks, however large the burst behind it actually was"
+	)
+
+
+func test_a_stale_backlog_does_not_replay_ahead_of_input_sent_after_a_long_silence() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	server.set_input(2, Vector2.RIGHT, 0)
+	server.set_input(2, Vector2.RIGHT, 1)
+	server.set_input(2, Vector2.RIGHT, 2)
+
+	# A single gap wide enough that the connection is given up on entirely — the three
+	# RIGHT entries above are stale, not something worth honouring once play resumes.
+	server.step(Constants.INPUT_TIMEOUT_SECONDS + 0.1)
+
+	# Play resumes with a fresh direction. Without discarding the stale backlog, this
+	# would queue behind the three already-stale entries and only take effect three
+	# ticks later than it should.
+	server.set_input(2, Vector2.UP, 3)
+	server.step(1.0 / 60.0)
+
+	var record: Array = server.build_snapshot()[0]
+	assert_eq(
+		NetProtocol.input_ack_of(record), 3,
+		"input sent after a long silence must be applied on the very next tick, not queued behind a stale backlog"
+	)
+
+
+func test_trim_input_queue_keeps_the_newest_entries() -> void:
+	var queue: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.ZERO},
+		{"sequence": 1, "direction": Vector2.ZERO},
+		{"sequence": 2, "direction": Vector2.ZERO},
+	]
+	var trimmed := ArenaServer.trim_input_queue(queue, 2)
+	assert_eq(trimmed.size(), 2, "a long backlog must not grow without bound")
+	assert_eq(trimmed[0]["sequence"], 1, "the oldest entry is what gets dropped")
+	assert_eq(trimmed[1]["sequence"], 2, "the newest entries survive the trim")
+
+
+func test_trim_input_queue_under_the_bound_changes_nothing() -> void:
+	var queue: Array[Dictionary] = [{"sequence": 0, "direction": Vector2.ZERO}]
+	assert_eq(
+		ArenaServer.trim_input_queue(queue, 10).size(), 1,
+		"a queue already under the bound must not lose anything"
+	)
+
+
 # ── Cast requests a modified client could send ────────────────────────────────────
 
 
