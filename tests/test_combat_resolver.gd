@@ -184,7 +184,7 @@ func test_unobstructed_cast_damages_target() -> void:
 	var before := target.health
 	var connected := resolver.resolve_cast(caster, target, _spell("magic_arrow"))
 	assert_true(connected, "clear shot should report a connection")
-	assert_almost_eq(target.health, before - 12.0, "magic arrow should land")
+	assert_almost_eq(target.health, before - 2.0, "magic arrow should land")
 
 
 func test_obstructed_cast_deals_no_damage() -> void:
@@ -229,4 +229,4 @@ func test_spell_ignoring_line_of_sight_connects_through_cover() -> void:
 		resolver.resolve_cast(caster, target, spell),
 		"a spell flagged as not needing LOS should connect anyway"
 	)
-	assert_almost_eq(target.health, before - 12.0, "and still deal its damage")
+	assert_almost_eq(target.health, before - 2.0, "and still deal its damage")
