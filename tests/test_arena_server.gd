@@ -190,6 +190,27 @@ func test_request_spam_is_capped() -> void:
 	)
 
 
+func test_the_request_budget_rolls_over_instead_of_running_out_for_good() -> void:
+	# #127: the budget is meant to be a rolling one-second window, not a lifetime cap.
+	# No `server.step()` happened between requests above, so that test alone cannot
+	# catch a missing rollover tick — this one spends the whole budget, lets a real
+	# second of simulated time pass, and checks the next request still goes through.
+	await _duel()
+	for _attempt in Constants.MAX_CAST_REQUESTS_PER_SECOND:
+		server.request_cast(2, ARROW, 3)
+	assert_false(
+		server.request_cast(2, ARROW, 3),
+		"the budget should already be spent for this window"
+	)
+
+	await _run(1.1)
+
+	assert_true(
+		server.request_cast(2, ARROW, 3),
+		"a full second later the budget must have rolled over, not stayed spent for the rest of the session"
+	)
+
+
 # ── Resolution ────────────────────────────────────────────────────────────────────
 
 
