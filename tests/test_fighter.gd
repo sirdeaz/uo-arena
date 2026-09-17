@@ -340,6 +340,31 @@ func test_no_stored_prediction_for_the_ack_needs_correcting() -> void:
 	)
 
 
+# ── prediction_error: the unrounded size behind the agree/disagree call, since #132 ─
+#
+# `prediction_already_agrees` only ever says yes or no. Measuring how often a real
+# correction fires, and how large, needed the actual distance underneath that
+# threshold — this is the same lookup, unrounded.
+
+
+func test_prediction_error_is_the_exact_distance_to_the_authoritative_position() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(10.0, 0.0)},
+	]
+	assert_almost_eq(
+		Fighter.prediction_error(history, 0, Vector2(40.0, 0.0)),
+		30.0,
+		"the error is the plain distance between the two, not thresholded against anything"
+	)
+
+
+func test_prediction_error_is_negative_with_nothing_to_compare_against() -> void:
+	assert_true(
+		Fighter.prediction_error([], -1, Vector2.ZERO) < 0.0,
+		"no stored prediction reports as unmeasurable, not as a zero-size correction"
+	)
+
+
 # ── Reconciliation is skipped when it would be a no-op, since #122 ──────────────────
 
 
