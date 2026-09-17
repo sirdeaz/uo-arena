@@ -172,6 +172,36 @@ func test_a_cast_in_a_snapshot_is_drawn() -> void:
 	assert_eq(state.current_spell.mantra, "Kal Vas Flam", "and the mantra needs this")
 
 
+# ── Snapshot delivery cadence (#132) ────────────────────────────────────────────────
+#
+# `snapshot_gap_is_notable` is the decision behind `_log_snapshot_gap`'s console line,
+# pulled out static the same way `Fighter.prediction_error` was for reconciliation
+# (#133) — this is the other half of that same "measure first" question: whether
+# snapshots themselves arrive unevenly, independent of whether a given gap goes on to
+# need a correction.
+
+
+func test_a_gap_at_the_nominal_interval_is_not_notable() -> void:
+	assert_false(
+		ArenaClient.snapshot_gap_is_notable(1.0 / Constants.SNAPSHOT_HZ),
+		"an evenly-arriving connection must print nothing at all"
+	)
+
+
+func test_a_gap_just_past_the_threshold_is_notable() -> void:
+	assert_true(
+		ArenaClient.snapshot_gap_is_notable(ArenaClient.SNAPSHOT_GAP_NOTABLE_SECONDS + 0.001),
+		"a genuinely late or bursty arrival must be worth a line"
+	)
+
+
+func test_a_gap_just_under_the_threshold_is_not_notable() -> void:
+	assert_false(
+		ArenaClient.snapshot_gap_is_notable(ArenaClient.SNAPSHOT_GAP_NOTABLE_SECONDS - 0.001),
+		"the threshold itself must not be flagged as though it were already exceeded"
+	)
+
+
 # ── Announced events ──────────────────────────────────────────────────────────────
 
 

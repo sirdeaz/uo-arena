@@ -22,6 +22,20 @@ signal cast_requested(spell_id: int, target_peer: int)
 ## occasionally selecting the wrong neighbour.
 const TARGET_PICK_RADIUS: float = 44.0
 
+## How much later than the nominal `1 / SNAPSHOT_HZ` spacing a snapshot's arrival has to
+## be before it earns its own log line. Twice the nominal interval rather than the
+## interval itself, so ordinary jitter that still lands within roughly one snapshot's
+## worth of slack stays quiet — this is meant to catch a genuinely late or bursty
+## delivery, not print on every ordinary tick the way that would drown out the signal.
+##
+## This measures the raw delivery cadence of `receive_snapshot` itself, independent of
+## whether a given gap went on to need a correction — `Fighter._log_reconciliation`
+## (#133) only ever shows the gaps that did. #132's still-open question is whether the
+## first several seconds after joining run rough because snapshots themselves arrive
+## unevenly during that window, or only because more of the (evenly-arriving) ones
+## happen to disagree with prediction then — this is the other half of that picture.
+const SNAPSHOT_GAP_NOTABLE_SECONDS: float = 2.0 / Constants.SNAPSHOT_HZ
+
 ## A scene rather than `Fighter.new()` so the collision shape, the character's
 ## `SpriteFrames` and the draw layers all come wired from `client/scenes/fighter.tscn`.
 const FIGHTER_SCENE := preload("res://client/scenes/fighter.tscn")
@@ -52,8 +66,20 @@ var _fighters: Dictionary = {}
 var _target_peer: int = 0
 var _last_event: String = ""
 
+## Wall-clock ms this client entered the tree — roughly "when you joined," used only to
+## timestamp a notable snapshot gap (#132). Not the same clock `Fighter._joined_at_msec`
+## uses (that starts slightly later, once the roster names your own fighter), but close
+## enough to line the two logs up by eye for the same several-second window.
+var _joined_at_msec: int = 0
+
+## Set by `_log_snapshot_gap` the first time a snapshot arrives; `-1` means none has yet,
+## which is what keeps the very first arrival from being measured against nothing.
+var _last_snapshot_at_msec: int = -1
+
 
 func _ready() -> void:
+	_joined_at_msec = Time.get_ticks_msec()
+
 	# The camera rides the local player from here on (`_update_camera`). `make_current`
 	# is all `_ready` does with it — the shared stage authors the zoom.
 	($Stage/Camera2D as Camera2D).make_current()
@@ -90,6 +116,7 @@ func apply_roster(peer_ids: PackedInt32Array, slots: PackedInt32Array) -> void:
 
 
 func apply_snapshot(records: Array) -> void:
+	_log_snapshot_gap()
 	for record in records:
 		if record.size() != NetProtocol.RECORD_SIZE:
 			continue
@@ -268,6 +295,30 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 # ── Internals ─────────────────────────────────────────────────────────────────────
+
+
+## Whether a gap of `seconds` since the previous snapshot arrived is worth its own log
+## line — see `SNAPSHOT_GAP_NOTABLE_SECONDS`'s own doc comment for why the bar sits at
+## twice the nominal interval rather than the interval itself. Static so it is checkable
+## without a socket or a real elapsed clock, the same convention this project already
+## uses for every other one-line decision.
+static func snapshot_gap_is_notable(seconds: float) -> bool:
+	return seconds > SNAPSHOT_GAP_NOTABLE_SECONDS
+
+
+## Prints one line whenever `receive_snapshot` fires notably later than it did last time
+## — the raw delivery cadence of the RPC itself, independent of whether that particular
+## gap went on to need a correction (#132). Diagnostic only: an evenly-arriving
+## connection prints nothing at all, the same "quiet unless something's off" contract
+## `Fighter._log_reconciliation` (#133) already keeps.
+func _log_snapshot_gap() -> void:
+	var now := Time.get_ticks_msec()
+	if _last_snapshot_at_msec >= 0:
+		var gap := (now - _last_snapshot_at_msec) / 1000.0
+		if snapshot_gap_is_notable(gap):
+			var since_join := (now - _joined_at_msec) / 1000.0
+			print("[snapshot-gap] t=+%.1fs gap=%.0fms" % [since_join, gap * 1000.0])
+	_last_snapshot_at_msec = now
 
 
 ## You are always blue; everyone else wears their slot. Keeping "blue is you" true is
