@@ -101,6 +101,13 @@ const RECONCILIATION_AGREEMENT_TOLERANCE: float = 0.5
 ## Where the server last said this fighter is. Ignored while `server_driven` is false.
 var server_position: Vector2 = Vector2.ZERO
 
+## Wall-clock ms this fighter entered the tree — a local player joining the match, in
+## practice, since nothing else calls `receive_server_snapshot`. Only ever read by
+## `_log_reconciliation` to timestamp a correction, not anything gameplay depends on —
+## see #132's "worse right after joining, settles after ~30s" report, which is the whole
+## reason a correction's age since join is worth printing at all.
+var _joined_at_msec: int = 0
+
 ## Set by `receive_server_snapshot` when a fresh snapshot names this fighter's own last
 ## acknowledged input. `-1` means no ack has ever arrived — `_input_history` still
 ## replays everything buffered in that case rather than discarding it, since there is
@@ -187,6 +194,8 @@ var _burst_expands: bool = true
 
 
 func _ready() -> void:
+	_joined_at_msec = Time.get_ticks_msec()
+
 	# A bare `Fighter.new()` — the sceneless-fallback test still makes one — comes in with
 	# no chrome. The scene wires the real resource; this is the fallback.
 	if chrome == null:
@@ -402,11 +411,25 @@ static func prediction_already_agrees(
 	history: Array[Dictionary], acked_sequence: int, authoritative_position: Vector2,
 	tolerance: float
 ) -> bool:
+	var error := prediction_error(history, acked_sequence, authoritative_position)
+	return error >= 0.0 and error <= tolerance
+
+
+## How far continuous prediction's own guess at `acked_sequence` actually landed from
+## `authoritative_position`, or `-1.0` if nothing was recorded for that sequence to
+## compare against. The same lookup `prediction_already_agrees` thresholds against
+## `tolerance`, pulled out unrounded so the real size of a correction can be measured —
+## #132's "measure first" step, in the same spirit as #89's own "log or expose real
+## correction/teleport frequency" — rather than only ever knowing it exceeded the
+## tolerance.
+static func prediction_error(
+	history: Array[Dictionary], acked_sequence: int, authoritative_position: Vector2
+) -> float:
 	for entry in history:
 		if entry["sequence"] == acked_sequence:
 			var predicted: Vector2 = entry["predicted_after"]
-			return predicted.distance_to(authoritative_position) <= tolerance
-	return false
+			return predicted.distance_to(authoritative_position)
+	return -1.0
 
 
 ## Keeps only the newest `max_entries` of a buffered input history. Static for the same
@@ -435,7 +458,24 @@ func receive_server_snapshot(position: Vector2, input_ack: int) -> void:
 		_pending_reconciliation = not prediction_already_agrees(
 			_input_history, input_ack, position, RECONCILIATION_AGREEMENT_TOLERANCE
 		)
+		if _pending_reconciliation:
+			_log_reconciliation(prediction_error(_input_history, input_ack, position))
 		_server_input_ack = input_ack
+
+
+## Prints one line per real correction, so reconciliation frequency and size can be read
+## straight off the console during a live playtest instead of only felt — #132's own
+## "measure first" step, before picking a fix for whatever turns out to be causing them.
+## Diagnostic only: nothing here feeds back into movement or gameplay, and a session with
+## nothing to correct prints nothing at all.
+##
+## Timestamped since join, not since the match started or in wall-clock time, because
+## #132's report was specifically that corrections run hot right after joining and settle
+## down after roughly thirty seconds — the age of the connection is the thing worth
+## reading off this line, not the time of day.
+func _log_reconciliation(error: float) -> void:
+	var since_join := (Time.get_ticks_msec() - _joined_at_msec) / 1000.0
+	print("[reconciliation] t=+%.1fs error=%.1fpx" % [since_join, error])
 
 
 ## Pulls a remote fighter toward the server's version of where it is. Exponential rather
