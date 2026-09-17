@@ -29,31 +29,14 @@ class Player extends RefCounted:
 	## has to stay free of rendering for the Dedicated Server export to stay clean.
 	var slot: int
 
-	## The direction actually governing this player's current physics step. Only ever
-	## written by `_step_movement` consuming one entry off `_input_queue` — never by
-	## `set_input` directly — so it always corresponds to exactly the input `_step_movement`
-	## last stepped with, not merely the most recent packet to arrive (#132).
 	var input: Vector2 = Vector2.ZERO
 	var seconds_since_input: float = 0.0
 
-	## The sequence number of whichever buffered entry `_step_movement` last actually
-	## consumed — not merely the most recent one `set_input` received. Echoed back in
-	## every snapshot record as `INPUT_ACK` so the client knows exactly which of its own
-	## buffered inputs are already folded into the position it is being told — see
-	## `Fighter.receive_server_snapshot` (#113). Before #132 this was set the instant a
-	## packet arrived, which could be several physics steps before (or, under a burst,
-	## the same step as) the direction it named was ever actually simulated.
+	## The most recent input sequence number this player's own client attached to a
+	## `submit_input` RPC. Echoed back in every snapshot record as `INPUT_ACK` so the
+	## client knows exactly which of its own buffered inputs are already folded into the
+	## position it is being told — see `Fighter.receive_server_snapshot` (#113).
 	var last_input_sequence: int = -1
-
-	## `{"sequence": int, "direction": Vector2}` dictionaries, oldest first — buffered by
-	## `set_input` as `submit_input` RPCs arrive, and drained by `_step_movement` at
-	## exactly one entry per physics tick (#132). Before this queue existed, `set_input`
-	## wrote straight into `input`/`last_input_sequence`, so however many packets a burst
-	## of jitter delivered between two physics steps, only the last one ever actually got
-	## simulated — the ones before it were silently never stepped at all, which the
-	## client's own one-buffered-tick-per-step reconciliation replay had no way to know
-	## and so read as a real (if small) misprediction on nearly every snapshot.
-	var _input_queue: Array[Dictionary] = []
 
 	## Who the last accepted cast request named.
 	var requested_target: int = 0
@@ -172,46 +155,19 @@ func slots() -> PackedInt32Array:
 # ── Requests from players ─────────────────────────────────────────────────────────
 
 
-## How much buffered input a stalled connection is allowed to build up before
-## `_step_movement` starts discarding the oldest of it rather than patiently draining
-## all of it one physics tick at a time. Reuses `INPUT_TIMEOUT_SECONDS` rather than
-## inventing a second tunable: that constant already says how long a silence has to run
-## before this player's input is given up on outright, so it is also a reasonable answer
-## to "how much backlog is still worth honouring" — the same convention
-## `Fighter.INPUT_HISTORY_SECONDS` uses for the client's own buffer (#132).
-static func _max_queued_inputs() -> int:
-	return int(ceil(Constants.INPUT_TIMEOUT_SECONDS * Engine.physics_ticks_per_second))
-
-
 ## Steering. The direction is clamped before it gets here; an unclamped one is a
 ## fifty-times-move-speed hack.
 ##
-## `sequence` is the client's own input-history tag. Buffered rather than applied
-## immediately — `_step_movement` is what actually consumes it, one entry per physics
-## tick, so a burst of several packets landing between two ticks can no longer make the
-## server silently skip simulating some of them (#132). Nothing here trusts `sequence`
-## for anything but the round trip back to the client that sent it, so an out-of-order or
-## replayed value only ever costs the sender their own reconciliation.
+## `sequence` is the client's own input-history tag, taken as-is and simply echoed back
+## in the next snapshot — nothing here trusts it for anything but that round trip, so an
+## out-of-order or replayed value only ever costs the sender their own reconciliation.
 func set_input(peer_id: int, direction: Vector2, sequence: int) -> void:
 	if not _players.has(peer_id):
 		return
 	var player: Player = _players[peer_id]
+	player.input = direction
 	player.seconds_since_input = 0.0
-	player._input_queue.append({"sequence": sequence, "direction": direction})
-	player._input_queue = trim_input_queue(player._input_queue, _max_queued_inputs())
-
-
-## Keeps only the newest `max_entries` of a buffered input queue — the server-side
-## counterpart of `Fighter.trim_input_history`, and for the same reason: a stall long
-## enough to build up a large backlog should catch up to roughly where the player
-## actually is now, not spend the next several seconds patiently re-simulating a queue of
-## by-then-ancient directions one tick at a time.
-static func trim_input_queue(
-	queue: Array[Dictionary], max_entries: int
-) -> Array[Dictionary]:
-	if queue.size() <= max_entries:
-		return queue
-	return queue.slice(queue.size() - max_entries, queue.size())
+	player.last_input_sequence = sequence
 
 
 ## Asks to begin a cast. Returns whether it was accepted, which is not the same as the
@@ -339,27 +295,13 @@ static func pick_spawn(spawns: Array[Vector2], occupied: Array[Vector2]) -> Vect
 # ── Internals ─────────────────────────────────────────────────────────────────────
 
 
-## Consumes at most one buffered input entry per call, so a step's own `input` and
-## `last_input_sequence` always correspond to the one entry actually stepped with —
-## never to whichever packet happened to be the latest arrival by the time this ran.
-## Ticks with nothing new queued simply keep holding the last entry consumed, the same
-## as before #132; ticks with several queued (a burst) still only consume one, so the
-## backlog drains in order over the next several ticks instead of collapsing into this
-## one the way a live-overwritten `input` used to.
 func _step_movement(player: Player, delta: float) -> void:
 	player.seconds_since_input += delta
 	if player.seconds_since_input > Constants.INPUT_TIMEOUT_SECONDS:
 		# Input arrives unreliably, so the packet that says "I let go" is the one that
 		# can go missing. Without this, losing it leaves someone jogging into a wall
-		# until they happen to press the button again. A backlog queued before the
-		# silence started is just as stale as the held direction it would otherwise
-		# keep re-simulating, so it is given up on too.
+		# until they happen to press the button again.
 		player.input = Vector2.ZERO
-		player._input_queue.clear()
-	elif not player._input_queue.is_empty():
-		var entry: Dictionary = player._input_queue.pop_front()
-		player.input = entry["direction"]
-		player.last_input_sequence = entry["sequence"]
 
 	Movement.step(player.body, player.input, player.combatant.can_move())
 	player.combatant.position = player.body.global_position
