@@ -7,7 +7,7 @@ const MAX_PLAYERS: int = 10
 ## Bumped whenever the shape of anything on the wire changes. A client whose number
 ## disagrees with the server's is refused at the door rather than left to misread
 ## records — a mismatched snapshot layout fails silently and confusingly otherwise.
-const PROTOCOL_VERSION: int = 2
+const PROTOCOL_VERSION: int = 3
 
 const PLAYER_MAX_HEALTH: float = 100.0
 const PLAYER_MOVE_SPEED: float = 225.0

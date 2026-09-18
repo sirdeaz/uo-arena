@@ -158,6 +158,11 @@ const HEALTH_HURT := Color("#e2574c")
 ## Fraction of maximum health below which the bar turns.
 const HEALTH_HURT_FRACTION: float = 0.35
 
+## The death overlay's full-screen wash. A named alpha of `HEALTH_HURT`, not a new hue —
+## dying is the same "hurt" signal the health bar already speaks, just filling the
+## screen instead of a bar.
+const DEATH_OVERLAY_ALPHA: float = 0.35
+
 
 # ── Status ────────────────────────────────────────────────────────────────────────
 # Rings around a body. Each one is the colour of the spell that put it there — the ring

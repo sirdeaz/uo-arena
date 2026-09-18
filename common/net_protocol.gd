@@ -25,9 +25,10 @@ enum Slot {
 	CAST_ELAPSED,
 	RECOVERY_ELAPSED,
 	INPUT_ACK,
+	RESPAWN_COUNTDOWN,
 }
 
-const RECORD_SIZE: int = 9
+const RECORD_SIZE: int = 10
 
 ## Status the client draws as a ring. Being alive is deliberately not in here — health
 ## is already in the record, and two fields that can disagree about the same fact is one
@@ -44,7 +45,14 @@ enum Flag {
 ## `Fighter.receive_server_snapshot` — but it rides along on every record rather than a
 ## second per-peer RPC, the same way `POSITION` rides along for fighters that only ever
 ## read it for rendering, not reconciliation.
-static func encode_combatant(peer_id: int, combatant: Combatant, input_ack: int = 0) -> Array:
+## `respawn_countdown` lives on `ArenaServer.Player`, not `Combatant` — it is scheduling
+## bookkeeping, not a rule the combatant enforces — but it rides along on every record the
+## same way `input_ack` does, rather than a second per-peer RPC. It is broadcast for every
+## player, not only the dead one, because the record is one flat array sent to everyone;
+## only the dying player's own client draws it.
+static func encode_combatant(
+	peer_id: int, combatant: Combatant, input_ack: int = 0, respawn_countdown: float = 0.0
+) -> Array:
 	var state := combatant.entity_state
 
 	var flags := 0
@@ -63,6 +71,7 @@ static func encode_combatant(peer_id: int, combatant: Combatant, input_ack: int 
 		state.cast_time_elapsed,
 		state.recovery_time_elapsed,
 		input_ack,
+		respawn_countdown,
 	]
 
 
@@ -80,6 +89,7 @@ static func apply_record(record: Array, combatant: Combatant) -> bool:
 
 	combatant.position = record[Slot.POSITION]
 	combatant.health = record[Slot.HEALTH]
+	combatant.respawn_countdown = record[Slot.RESPAWN_COUNTDOWN]
 
 	# A nominal duration is enough to light the ring, and the next snapshot in 50 ms
 	# either relights it or does not. Nothing on a mirror ever counts these down.

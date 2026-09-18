@@ -168,6 +168,22 @@ func test_the_readout_starts_at_the_same_margin_as_the_bar() -> void:
 	viewport.queue_free()
 
 
+# ── Death overlay (#136) ─────────────────────────────────────────────────────────
+
+
+func test_showing_the_death_countdown_makes_the_overlay_visible() -> void:
+	add_child(hud)
+	hud.show_death_countdown(2.5)
+	assert_true(hud.death_overlay.visible, "a shown countdown should be visible")
+
+
+func test_clearing_the_death_overlay_hides_it() -> void:
+	add_child(hud)
+	hud.show_death_countdown(2.5)
+	hud.clear_death_overlay()
+	assert_false(hud.death_overlay.visible, "clearing should hide the overlay")
+
+
 # ── Readout ───────────────────────────────────────────────────────────────────────
 
 
