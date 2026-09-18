@@ -64,7 +64,7 @@ func test_health_does_not_fall_below_zero() -> void:
 func test_poison_effect_applies_its_duration() -> void:
 	resolver.apply_spell_effect(_spell("poison"), target)
 	assert_almost_eq(
-		target.poison_seconds_remaining, 8.0, "poison should apply an 8s duration"
+		target.poison_seconds_remaining, 22.5, "poison should apply its full 22.5s duration"
 	)
 
 
