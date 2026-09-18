@@ -32,6 +32,18 @@ class_name FighterChrome
 @export var overhead_gap: float = 6.0
 ## Gap between the health bar and the mantra above it.
 @export var mantra_gap: float = 14.0
+## Gap between the mantra's baseline and the nickname above it. The nickname keeps a band
+## of its own, held whether or not a cast is running, so the mantra never moves and never
+## has to make room for a name — reading which spell is coming is worth more than a tight
+## idle layout (#145).
+@export var nickname_gap: float = 18.0
+
+@export_group("Nickname")
+## Point size the nickname is set in. Smaller than the mantra deliberately: the two pieces
+## of overhead text must never be mistaken for one another at a glance.
+@export var nickname_font_size: int = 13
+## Thickness of the dark halo behind the nickname, so it reads over the arena floor.
+@export var nickname_outline_size: int = 3
 
 @export_group("Mantra")
 ## Point size the mantra is set in.

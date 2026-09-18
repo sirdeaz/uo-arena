@@ -498,3 +498,37 @@ func test_a_shot_into_cover_is_refused_before_it_starts() -> void:
 		EntityState.State.IDLE,
 		"a refusal costs nothing — not even recovery"
 	)
+
+
+# ── Nicknames, since #145 ───────────────────────────────────────────────────────────
+
+
+func test_a_nickname_is_cleaned_on_the_way_in() -> void:
+	server.add_player(2, "  Lord\nBritish  ")
+	assert_eq(
+		server.nicknames()[0], "Lord British",
+		"the server cleans what a client sends rather than trusting it"
+	)
+
+
+func test_a_player_who_gave_no_name_is_named_by_slot() -> void:
+	server.add_player(2)
+	assert_eq(
+		server.nicknames()[0], ArenaServer.default_nickname(server.slots()[0]),
+		"every fighter needs a tag to draw, so an empty name falls back rather than blanking"
+	)
+
+
+func test_a_name_of_only_whitespace_falls_back_the_same_way() -> void:
+	server.add_player(2, "     ")
+	assert_eq(
+		server.nicknames()[0], ArenaServer.default_nickname(server.slots()[0]),
+		"an invisible name is no name — nobody gets to play as a blank tag"
+	)
+
+
+func test_default_nicknames_count_from_one_not_zero() -> void:
+	assert_eq(
+		ArenaServer.default_nickname(0), "Player 1",
+		"slot 0 is the first player, and nobody reading a tag mid-fight counts from zero"
+	)

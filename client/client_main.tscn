@@ -25,7 +25,12 @@ text = "UO Arena"
 theme_override_font_sizes/font_size = 34
 
 [node name="Hint" type="Label" parent="Menu/Panel"]
-text = "Enter the address of a server, or practise on your own."
+text = "Pick a name and the address of a server, or practise on your own."
+
+[node name="Nickname" type="LineEdit" parent="Menu/Panel"]
+custom_minimum_size = Vector2(300, 0)
+max_length = 16
+placeholder_text = "Nickname"
 
 [node name="Address" type="LineEdit" parent="Menu/Panel"]
 custom_minimum_size = Vector2(300, 0)

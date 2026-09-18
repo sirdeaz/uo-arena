@@ -143,3 +143,45 @@ func test_a_casting_record_with_no_spell_reads_as_idle() -> void:
 		EntityState.State.IDLE,
 		"casting nothing is not casting"
 	)
+
+
+# ── Nicknames, since #145 ───────────────────────────────────────────────────────────
+#
+# The one piece of player-chosen text this game draws on *other* people's screens, so it
+# arrives assumed hostile and is cleaned before anything keeps it.
+
+
+func test_a_plain_nickname_survives_untouched() -> void:
+	assert_eq(
+		NetProtocol.sanitize_nickname("Lord British"), "Lord British",
+		"an ordinary name must come through exactly as typed"
+	)
+
+
+func test_a_nickname_is_cut_to_the_length_cap() -> void:
+	var long_name := "x".repeat(Constants.NICKNAME_MAX_LENGTH + 40)
+	assert_eq(
+		NetProtocol.sanitize_nickname(long_name).length(), Constants.NICKNAME_MAX_LENGTH,
+		"a name long enough to stretch a tag across the arena is cut, not kept"
+	)
+
+
+func test_newlines_cannot_break_a_nickname_onto_a_second_line() -> void:
+	assert_eq(
+		NetProtocol.sanitize_nickname("Lord\nBritish"), "Lord British",
+		"a newline becomes a space rather than being dropped, so the words stay separate"
+	)
+
+
+func test_a_nickname_of_only_whitespace_survives_as_nothing() -> void:
+	assert_eq(
+		NetProtocol.sanitize_nickname("   \t  "), "",
+		"an invisible name must come back empty so the server can name them by slot"
+	)
+
+
+func test_padding_cannot_smuggle_a_blank_nickname_past_the_cap() -> void:
+	assert_eq(
+		NetProtocol.sanitize_nickname("a" + "     " + "b"), "a b",
+		"runs of whitespace collapse, so a name cannot be padded out to look empty"
+	)

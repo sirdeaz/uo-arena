@@ -95,17 +95,26 @@ func _ready() -> void:
 ##
 ## The server sends slot numbers, not colours — what a slot looks like is decided here,
 ## which is why `server/` never has to know what rose means.
-func apply_roster(peer_ids: PackedInt32Array, slots: PackedInt32Array) -> void:
+func apply_roster(
+	peer_ids: PackedInt32Array, slots: PackedInt32Array, nicknames: PackedStringArray
+) -> void:
 	var present := {}
 	for index in peer_ids.size():
 		var peer_id := peer_ids[index]
 		present[peer_id] = true
 		var slot := slots[index] if index < slots.size() else index
 		var color := _color_for(peer_id, slot)
+		# The server always sends a name for everyone on it, but a roster that arrived
+		# short is still a roster — fall back rather than draw a fighter with a blank tag.
+		var nickname := (
+			nicknames[index] if index < nicknames.size()
+			else ArenaServer.default_nickname(slot)
+		)
 		if _fighters.has(peer_id):
 			_fighters[peer_id].body_color = color
+			_fighters[peer_id].nickname = nickname
 		else:
-			_add_fighter(peer_id, color)
+			_add_fighter(peer_id, color, nickname)
 
 	for peer_id in _fighters.keys():
 		if not present.has(peer_id):
@@ -330,9 +339,10 @@ func _color_for(peer_id: int, slot: int) -> Color:
 	return Palette.opponent_body(slot)
 
 
-func _add_fighter(peer_id: int, color: Color) -> void:
+func _add_fighter(peer_id: int, color: Color, nickname: String) -> void:
 	var fighter: Fighter = FIGHTER_SCENE.instantiate()
 	fighter.body_color = color
+	fighter.nickname = nickname
 	fighter.server_driven = true
 	fighter.player_controlled = peer_id == local_peer_id
 	add_child(fighter)

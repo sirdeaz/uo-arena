@@ -82,6 +82,11 @@ const RECONCILIATION_AGREEMENT_TOLERANCE: float = 0.5
 @export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
 
+## What this fighter is called, drawn overhead. Set from the roster — `ArenaClient`
+## sanitizes nothing here because the server already has (`NetProtocol.sanitize_nickname`).
+## Empty draws nothing at all, which is what a bare `Fighter.new()` in a test gets.
+@export var nickname: String = ""
+
 ## The overhead-chrome measurements — health bar, status-ring offsets, mantra sizing,
 ## footing rim, and the two sprite anchors the reads hang off. A resource so the art is
 ## tuned in the inspector, not as constants here. `fighter.tscn` names
@@ -944,6 +949,7 @@ func _draw_ui() -> void:
 
 	_draw_health_bar()
 	_draw_mantra()
+	_draw_nickname()
 
 
 func _draw_fx() -> void:
@@ -1025,7 +1031,10 @@ func _draw_mantra() -> void:
 	var text: String = state.current_spell.mantra
 	var font_size := chrome.mantra_font_size
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-	var origin := Vector2(-width * 0.5, chrome.head_top - chrome.overhead_gap - chrome.mantra_gap)
+	var origin := Vector2(
+		-width * 0.5,
+		overhead_mantra_y(chrome.head_top, chrome.overhead_gap, chrome.mantra_gap)
+	)
 
 	# Dark outline so the words stay readable over the arena floor. One call rather than
 	# the four offset passes this used to take.
@@ -1035,6 +1044,51 @@ func _draw_mantra() -> void:
 	)
 	_ui.draw_string(
 		font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, MANTRA_COLOR
+	)
+
+
+## Where the mantra's baseline sits: up past the health bar, then the mantra's own gap.
+## Static so the one relationship that matters — that the nickname sits strictly above
+## this and never in it — is checkable without a scene tree (#145).
+static func overhead_mantra_y(
+	head_top: float, overhead_gap: float, mantra_gap: float
+) -> float:
+	return head_top - overhead_gap - mantra_gap
+
+
+## Where the nickname's baseline sits: the mantra's band, and then some. Reserved whether
+## or not a cast is running, which is the whole point — the mantra is the read that
+## decides fights, so it keeps a fixed position and a name never displaces or covers it.
+static func overhead_nickname_y(
+	head_top: float, overhead_gap: float, mantra_gap: float, nickname_gap: float
+) -> float:
+	return overhead_mantra_y(head_top, overhead_gap, mantra_gap) - nickname_gap
+
+
+## The name overhead, in the fighter's own body colour so the tag and the body it names
+## read as one identity. Set in the UI font rather than `SpellVisuals.MANTRA_FONT`: a
+## nickname must never be mistaken for a mantra at a glance, and the Uncial face is the
+## mantra's signature.
+func _draw_nickname() -> void:
+	if nickname == "":
+		return
+
+	var font := ThemeDB.fallback_font
+	var font_size := chrome.nickname_font_size
+	var width := font.get_string_size(nickname, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var origin := Vector2(
+		-width * 0.5,
+		overhead_nickname_y(
+			chrome.head_top, chrome.overhead_gap, chrome.mantra_gap, chrome.nickname_gap
+		)
+	)
+
+	_ui.draw_string_outline(
+		font, origin, nickname, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size,
+		chrome.nickname_outline_size, Palette.OUTLINE
+	)
+	_ui.draw_string(
+		font, origin, nickname, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, body_color
 	)
 
 

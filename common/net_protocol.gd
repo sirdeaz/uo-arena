@@ -125,3 +125,37 @@ static func sanitize_direction(direction: Vector2) -> Vector2:
 	if not is_finite(direction.x) or not is_finite(direction.y):
 		return Vector2.ZERO
 	return direction.limit_length(1.0)
+
+
+## Cleans a nickname arriving from a client, returning `""` when nothing usable survives
+## — `ArenaServer.default_nickname` is what fills that in, because only the server knows
+## which slot the name belongs to.
+##
+## The same kind of defence `sanitize_direction` is: a nickname is the one piece of
+## player-chosen text this game draws on *other* people's screens, so it arrives assumed
+## hostile. Control characters and newlines would break out of the single line the tag is
+## drawn on, a run of spaces would let someone render an invisible name, and an
+## arbitrarily long one would stretch a tag across the arena over everyone else's fight.
+##
+## Note this is a *display* name and nothing else. Identity is still `get_remote_sender_id()`
+## and only that — see the header above `join_arena`. Two players may pick the same
+## nickname and the server neither knows nor cares.
+static func sanitize_nickname(raw: String) -> String:
+	var cleaned := ""
+	for character in raw:
+		# Anything below space — newlines and tabs included — becomes a space rather than
+		# being dropped, so "a\nb" reads as two words instead of silently becoming "ab".
+		if character.unicode_at(0) < 32 or character.unicode_at(0) == 127:
+			cleaned += " "
+		else:
+			cleaned += character
+
+	# Collapse the runs those substitutions can leave behind, so a name cannot be padded
+	# out to the length cap with whitespace and render as a blank tag.
+	while cleaned.contains("  "):
+		cleaned = cleaned.replace("  ", " ")
+
+	cleaned = cleaned.strip_edges()
+	if cleaned.length() > Constants.NICKNAME_MAX_LENGTH:
+		cleaned = cleaned.substr(0, Constants.NICKNAME_MAX_LENGTH).strip_edges()
+	return cleaned

@@ -469,3 +469,67 @@ func test_a_snapshot_that_disagrees_still_arms_and_resolves_reconciliation() -> 
 		"the skip path must never come at the cost of #113's own convergence guarantee"
 	)
 	fighter.queue_free()
+
+
+# ── The nickname never takes the mantra's slot, since #145 ──────────────────────────
+#
+# The mantra is the read that decides fights — what spell is coming, and what a
+# fizzle-feint fakes. A name drawn overhead must sit strictly above it and must never
+# move it, so the mantra's position is the same whether anyone is called anything.
+
+
+func test_the_nickname_sits_strictly_above_the_mantra() -> void:
+	var chrome := FighterChrome.new()
+	var mantra_y := Fighter.overhead_mantra_y(
+		chrome.head_top, chrome.overhead_gap, chrome.mantra_gap
+	)
+	var nickname_y := Fighter.overhead_nickname_y(
+		chrome.head_top, chrome.overhead_gap, chrome.mantra_gap, chrome.nickname_gap
+	)
+	assert_true(
+		nickname_y < mantra_y,
+		"negative y is up, so the name has to be the smaller number — a tag level with " +
+		"the mantra would cover the one read worth protecting"
+	)
+
+
+func test_the_mantra_does_not_move_when_a_nickname_is_present() -> void:
+	# The nickname's band is reserved whether or not anyone is casting, so nothing about
+	# the mantra's own placement is allowed to depend on the name above it.
+	var chrome := FighterChrome.new()
+	var with_a_wide_gap := chrome.nickname_gap + 100.0
+	assert_almost_eq(
+		Fighter.overhead_nickname_y(
+			chrome.head_top, chrome.overhead_gap, chrome.mantra_gap, with_a_wide_gap
+		) + with_a_wide_gap,
+		Fighter.overhead_mantra_y(chrome.head_top, chrome.overhead_gap, chrome.mantra_gap),
+		"moving the name must not move the mantra: the gap is measured off the mantra, " +
+		"never the other way round"
+	)
+
+
+func test_a_fighter_with_no_nickname_draws_nothing_rather_than_erroring() -> void:
+	var fighter := FIGHTER_SCENE.instantiate()
+	add_child(fighter)
+	await get_tree().physics_frame
+	assert_eq(
+		fighter.nickname, "",
+		"a bare fighter — a test's, or the practice harness's — has no name and must not " +
+		"need one to draw"
+	)
+	fighter.queue_free()
+
+
+func test_a_named_fighter_actually_draws_its_tag_without_erroring() -> void:
+	# Exercises `_draw_nickname`'s real drawing path rather than only its geometry — a
+	# missing font or a bad colour would never show up in the arithmetic above.
+	var fighter := FIGHTER_SCENE.instantiate()
+	fighter.nickname = "Lord British"
+	add_child(fighter)
+	await get_tree().physics_frame
+	await get_tree().process_frame
+	assert_eq(
+		fighter.nickname, "Lord British",
+		"a fighter must survive a frame with a name set, tag drawn and all"
+	)
+	fighter.queue_free()

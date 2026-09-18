@@ -29,6 +29,12 @@ class Player extends RefCounted:
 	## has to stay free of rendering for the Dedicated Server export to stay clean.
 	var slot: int
 
+	## What this player is called on everyone else's screen. Sanitized on arrival and
+	## never empty — `add_player` falls back to `default_nickname` — so the client can
+	## draw it without checking. Rides the roster RPC, not the snapshot record: it changes
+	## once a session, and `NetProtocol`'s own header says why the record stays lean.
+	var nickname: String = ""
+
 	## The direction actually governing this player's current physics step. Only ever
 	## written by `_step_movement` consuming an entry off `_input_queue` — never by
 	## `set_input` directly — so it always corresponds to exactly the input
@@ -114,7 +120,19 @@ func _ready() -> void:
 # ── Roster ────────────────────────────────────────────────────────────────────────
 
 
-func add_player(peer_id: int) -> bool:
+## What a player is called when they gave nothing usable. Named off the slot rather than
+## the peer id: a peer id is a transport detail that means nothing to anyone reading it
+## over someone's head, and the slot is already the number the client colours bodies by,
+## so "Player 2" and the second body colour agree.
+static func default_nickname(slot: int) -> String:
+	return "Player %d" % (slot + 1)
+
+
+## `nickname` is a display label and nothing else — identity is still the transport's own
+## `get_remote_sender_id()`, never a field a client fills in. Cleaned here rather than
+## trusted (`NetProtocol.sanitize_nickname`), and anything that does not survive that
+## falls back to the slot's own name, so every fighter always has a tag to draw.
+func add_player(peer_id: int, nickname: String = "") -> bool:
 	if _players.has(peer_id) or _players.size() >= Constants.MAX_PLAYERS:
 		return false
 
@@ -122,6 +140,10 @@ func add_player(peer_id: int) -> bool:
 	player.peer_id = peer_id
 	player.slot = _free_slot()
 	player.input_flow = new_input_flow()
+
+	player.nickname = NetProtocol.sanitize_nickname(nickname)
+	if player.nickname == "":
+		player.nickname = default_nickname(player.slot)
 
 	player.combatant = Combatant.new()
 	add_child(player.combatant)
@@ -202,6 +224,14 @@ func slots() -> PackedInt32Array:
 	var out := PackedInt32Array()
 	for peer_id in _players:
 		out.append(_players[peer_id].slot)
+	return out
+
+
+## Nicknames in the same order `peer_ids` and `slots` come out, for the roster broadcast.
+func nicknames() -> PackedStringArray:
+	var out := PackedStringArray()
+	for peer_id in _players:
+		out.append(_players[peer_id].nickname)
 	return out
 
 

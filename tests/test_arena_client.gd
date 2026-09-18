@@ -30,12 +30,12 @@ func after_each() -> void:
 	source.queue_free()
 
 
-func _roster(peer_ids: Array) -> void:
+func _roster(peer_ids: Array, nicknames: Array = []) -> void:
 	var ids := PackedInt32Array(peer_ids)
 	var slots := PackedInt32Array()
 	for index in peer_ids.size():
 		slots.append(index)
-	client.apply_roster(ids, slots)
+	client.apply_roster(ids, slots, PackedStringArray(nicknames))
 
 
 func _fighter(peer_id: int) -> Fighter:
