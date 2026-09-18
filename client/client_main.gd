@@ -15,6 +15,7 @@ const DEFAULT_ADDRESS := "127.0.0.1"
 @export var practice_scene: PackedScene
 
 @onready var _menu: CanvasLayer = $Menu
+@onready var _nickname: LineEdit = $Menu/Panel/Nickname
 @onready var _address: LineEdit = $Menu/Panel/Address
 @onready var _status: Label = $Menu/Panel/Status
 @onready var _connect_button: Button = $Menu/Panel/ConnectButton
@@ -36,6 +37,9 @@ func _ready() -> void:
 
 	_address.text = DEFAULT_ADDRESS
 	_address.text_submitted.connect(func(text: String) -> void: _connect_to(text))
+	# Enter in the nickname field connects too, rather than doing nothing — the address
+	# is usually already filled in from last time, so the name is the field you land on.
+	_nickname.text_submitted.connect(func(_text: String) -> void: _connect_to(_address.text))
 	_connect_button.pressed.connect(func() -> void: _connect_to(_address.text))
 	($Menu/Panel/PracticeButton as Button).pressed.connect(_go_to_practice)
 
@@ -69,6 +73,8 @@ func _connect_to(address: String) -> void:
 	_connect_button.disabled = true
 	_status.text = "connecting to %s…" % host
 
-	if NetworkManager.join(host, NetworkManager.requested_port()) != OK:
+	# Sent as typed. The server is what cleans it and what fills in a default for an empty
+	# one — a client's idea of an acceptable name is not something to take on trust.
+	if NetworkManager.join(host, NetworkManager.requested_port(), _nickname.text) != OK:
 		_connect_button.disabled = false
 		_status.text = "could not open a connection to %s" % host

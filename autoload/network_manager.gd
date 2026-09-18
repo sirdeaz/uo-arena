@@ -26,6 +26,10 @@ const CONNECT_TIMEOUT_SECONDS: float = 5.0
 
 var _connecting_for: float = -1.0
 
+## What the join screen asked to be called. Held from `join` until the connection is up,
+## because `join_arena` cannot be sent until there is a server to send it to.
+var _pending_nickname: String = ""
+
 
 func _ready() -> void:
 	if _supplies_its_own_scene():
@@ -176,7 +180,9 @@ func _on_peer_disconnected(peer_id: int) -> void:
 
 func _broadcast_roster() -> void:
 	if arena_server != null:
-		receive_roster.rpc(arena_server.peer_ids(), arena_server.slots())
+		receive_roster.rpc(
+			arena_server.peer_ids(), arena_server.slots(), arena_server.nicknames()
+		)
 
 
 func _on_snapshot_ready(records: Array) -> void:
@@ -202,11 +208,12 @@ func _on_spell_resolved(
 # ── Joining ───────────────────────────────────────────────────────────────────────
 
 
-func join(address: String, port: int) -> Error:
+func join(address: String, port: int, nickname: String = "") -> Error:
 	var peer := _create_client_peer(address, port)
 	if peer == null:
 		return ERR_CANT_CONNECT
 
+	_pending_nickname = nickname
 	multiplayer.multiplayer_peer = peer
 	_harden()
 	multiplayer.connected_to_server.connect(_on_connected_to_server, CONNECT_ONE_SHOT)
@@ -232,7 +239,7 @@ func _on_connected_to_server() -> void:
 	if previous != null:
 		previous.queue_free()
 
-	join_arena.rpc_id(1, Constants.PROTOCOL_VERSION)
+	join_arena.rpc_id(1, Constants.PROTOCOL_VERSION, _pending_nickname)
 
 
 func _on_connection_failed() -> void:
@@ -281,8 +288,12 @@ func _harden() -> void:
 # `transfer_channel` would need a matching `channel_count` at both ends to work.
 
 
+## `nickname` is the one piece of client-chosen text that reaches other players' screens,
+## and it is not an exception to the rule above: it is a label hung on whoever
+## `get_remote_sender_id()` says this is, never a claim about who they are. The server
+## cleans it (`NetProtocol.sanitize_nickname`, via `add_player`) rather than trusting it.
 @rpc("any_peer", "call_remote", "reliable")
-func join_arena(protocol_version: int) -> void:
+func join_arena(protocol_version: int, nickname: String = "") -> void:
 	if not multiplayer.is_server() or arena_server == null:
 		return
 	# Valid only for the duration of this call, so read it before anything else.
@@ -295,7 +306,7 @@ func join_arena(protocol_version: int) -> void:
 
 	# Deliberately here rather than on `peer_connected`: that fires before the joining
 	# client has a scene to receive anything, so a roster sent then lands nowhere.
-	if not arena_server.add_player(sender):
+	if not arena_server.add_player(sender, nickname):
 		receive_rejected.rpc_id(sender, "the arena is full")
 		_disconnect_peer(sender)
 		return
@@ -344,9 +355,11 @@ func receive_spell_resolved(
 
 
 @rpc("authority", "call_remote", "reliable")
-func receive_roster(peer_ids: PackedInt32Array, slots: PackedInt32Array) -> void:
+func receive_roster(
+	peer_ids: PackedInt32Array, slots: PackedInt32Array, nicknames: PackedStringArray
+) -> void:
 	if arena_client != null:
-		arena_client.apply_roster(peer_ids, slots)
+		arena_client.apply_roster(peer_ids, slots, nicknames)
 
 
 @rpc("authority", "call_remote", "reliable")
