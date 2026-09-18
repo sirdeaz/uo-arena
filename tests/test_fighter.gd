@@ -365,6 +365,67 @@ func test_prediction_error_is_negative_with_nothing_to_compare_against() -> void
 	)
 
 
+# ── Which side of the server the prediction landed on, since #141 ───────────────────
+#
+# After #140 every live correction is exactly one physics tick, and the magnitude above
+# cannot say whether the server stepped one time too few (an input it never simulated) or
+# one time too many (a step it took with nothing queued). Those are opposite faults
+# wanting opposite fixes, and the sign along the travel direction is what separates them.
+
+
+func test_the_client_running_further_than_the_server_reads_as_negative() -> void:
+	# Predicted 40 travelling right, server only got to 36.25 — one tick short, the
+	# signature of an input dropped at the server's cap or lost in flight.
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(40.0, 0.0)},
+	]
+	assert_almost_eq(
+		Fighter.prediction_error_along_travel(history, 0, Vector2(36.25, 0.0)),
+		-3.75,
+		"an input the server never stepped leaves the client ahead, and that has to read " +
+		"as a different sign from the server having stepped one time too many"
+	)
+
+
+func test_the_server_running_further_than_the_client_reads_as_positive() -> void:
+	# The other half: the server re-ran a held direction on a tick with nothing queued,
+	# so it travelled a tick further than anything the client predicted.
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(40.0, 0.0)},
+	]
+	assert_almost_eq(
+		Fighter.prediction_error_along_travel(history, 0, Vector2(43.75, 0.0)),
+		3.75,
+		"a step the server took with no input entry of its own leaves it ahead of the client"
+	)
+
+
+func test_the_sign_follows_travel_direction_rather_than_the_axes() -> void:
+	# Travelling up, where a raw y component would report the opposite sign to the one
+	# that means "the server ran further" — the projection is onto the direction, not onto
+	# an axis, precisely so a log line means the same thing whichever way a player ran.
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.UP, "can_move": true, "predicted_after": Vector2(0.0, -40.0)},
+	]
+	assert_almost_eq(
+		Fighter.prediction_error_along_travel(history, 0, Vector2(0.0, -43.75)),
+		3.75,
+		"running further than predicted is positive whichever direction the running was in"
+	)
+
+
+func test_a_standing_tick_has_no_side_to_report() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.ZERO, "can_move": true, "predicted_after": Vector2.ZERO},
+	]
+	assert_almost_eq(
+		Fighter.prediction_error_along_travel(history, 0, Vector2(5.0, 0.0)),
+		0.0,
+		"a tick that was not travelling has no direction to project onto, so no side — " +
+		"`prediction_error` is what says whether there was anything to compare at all"
+	)
+
+
 # ── Reconciliation is skipped when it would be a no-op, since #122 ──────────────────
 
 

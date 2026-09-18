@@ -247,6 +247,100 @@ func test_trim_input_queue_under_the_bound_changes_nothing() -> void:
 	)
 
 
+# ── Input-flow counters, since #141 ─────────────────────────────────────────────────
+#
+# #140 collapsed live corrections to a floor of exactly one physics tick each. Three
+# different faults produce that same one-tick error, and the client sees an identical
+# unsigned number for all of them — an input dropped at the cap, an input lost in flight,
+# or a step taken with nothing queued that re-ran the held direction. These count each
+# separately, at the one place that can actually tell them apart. Counting only: none of
+# it changes what the simulation does.
+
+
+func test_a_dry_step_is_counted_but_changes_nothing() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	server.set_input(2, Vector2.RIGHT, 0)
+
+	server.step(1.0 / 60.0)
+	var after_drain := server.combatant_of(2).position
+	assert_eq(server.input_flow_of(2)["dry"], 0, "a step that consumed an entry is not dry")
+
+	# Nothing queued for this one, so the server re-runs the direction it already holds —
+	# a step the client's one-entry-one-step replay model has no entry for.
+	server.step(1.0 / 60.0)
+	assert_eq(
+		server.input_flow_of(2)["dry"], 1,
+		"a step with an empty queue has to be counted — it is the half of the one-tick " +
+		"error that leaves the server ahead of what the client predicted"
+	)
+	assert_true(
+		server.combatant_of(2).position.x > after_drain.x,
+		"and counting it must not stop it happening: #141 measures, #142 decides"
+	)
+
+
+func test_an_input_dropped_at_the_cap_is_counted() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	var burst_size := 10
+	for sequence in burst_size:
+		server.set_input(2, Vector2.RIGHT, sequence)
+
+	assert_eq(
+		server.input_flow_of(2)["dropped"], burst_size - ArenaServer.MAX_QUEUED_INPUTS,
+		"every entry the cap discards is one the client predicted and this server will " +
+		"never step, so every one of them has to be counted"
+	)
+
+
+func test_a_sequence_that_never_arrived_is_counted_as_missing() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	server.set_input(2, Vector2.RIGHT, 0)
+	# 1 and 2 never arrive — `unreliable_ordered` discards rather than retransmitting.
+	server.set_input(2, Vector2.RIGHT, 3)
+
+	assert_eq(
+		server.input_flow_of(2)["missing"], 2,
+		"a forward jump in sequence is the only direct measurement of real packet loss " +
+		"anything in this project has"
+	)
+
+
+func test_input_arriving_in_order_reports_nothing_missing() -> void:
+	server.add_player(2)
+	_place(2, Vector2.ZERO)
+	for sequence in 3:
+		server.set_input(2, Vector2.RIGHT, sequence)
+
+	assert_eq(
+		server.input_flow_of(2)["missing"], 0,
+		"an unbroken run of sequences must not read as loss, or the measurement is noise"
+	)
+
+
+func test_format_input_flow_averages_the_depth_it_was_given() -> void:
+	var flow := ArenaServer.new_input_flow()
+	flow["drained"] = 4
+	flow["depth_total"] = 6
+	flow["depth_max"] = 3
+	var line := ArenaServer.format_input_flow(7, flow)
+	assert_true(
+		line.contains("depth_avg=1.50"),
+		"average backlog is what says whether the queue is keeping up at all"
+	)
+	assert_true(line.contains("peer=7"), "a line has to say which player it describes")
+
+
+func test_format_input_flow_does_not_divide_by_a_window_that_drained_nothing() -> void:
+	var line := ArenaServer.format_input_flow(7, ArenaServer.new_input_flow())
+	assert_true(
+		line.contains("depth_avg=0.00"),
+		"a window where nothing drained has no average to report, and must not divide by zero"
+	)
+
+
 # ── Cast requests a modified client could send ────────────────────────────────────
 
 

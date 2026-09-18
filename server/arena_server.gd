@@ -54,6 +54,16 @@ class Player extends RefCounted:
 	## correction.
 	var _input_queue: Array[Dictionary] = []
 
+	## The highest sequence number any `submit_input` has carried for this player yet.
+	## Only #141's gap counting reads it — nothing in the simulation trusts a sequence for
+	## anything beyond the round trip back to the client that sent it.
+	var last_received_sequence: int = -1
+
+	## #141's input-flow counters for the window `_log_input_flow` is currently filling.
+	## See `ArenaServer.new_input_flow` for the shape and `format_input_flow` for what
+	## each one is asking. Diagnostic only: nothing here feeds back into the simulation.
+	var input_flow: Dictionary = {}
+
 	## Who the last accepted cast request named.
 	var requested_target: int = 0
 	## Who the spell currently in the air was aimed at when it began.
@@ -88,6 +98,14 @@ var _players: Dictionary = {}
 var _spawns: Array[Vector2] = []
 var _snapshot_accumulator: float = 0.0
 
+## How often `_log_input_flow` prints a window and starts a fresh one. Long enough that a
+## live session reads as a handful of lines per player rather than a scroll, short enough
+## that a burst of trouble is still visible as its own window rather than averaged away
+## across a whole match (#141).
+const INPUT_FLOW_LOG_SECONDS: float = 5.0
+
+var _input_flow_accumulator: float = 0.0
+
 
 func _ready() -> void:
 	_spawns = map.get_spawn_positions()
@@ -103,6 +121,7 @@ func add_player(peer_id: int) -> bool:
 	var player := Player.new()
 	player.peer_id = peer_id
 	player.slot = _free_slot()
+	player.input_flow = new_input_flow()
 
 	player.combatant = Combatant.new()
 	add_child(player.combatant)
@@ -163,6 +182,15 @@ func respawn_countdown_of(peer_id: int) -> float:
 	return _players[peer_id].respawn_countdown
 
 
+## This player's #141 input-flow counters for the window in progress, or an empty
+## dictionary if they are not on the roster. Read by the tests; the live server reads
+## them through `_log_input_flow` instead.
+func input_flow_of(peer_id: int) -> Dictionary:
+	if not _players.has(peer_id):
+		return {}
+	return _players[peer_id].input_flow
+
+
 func peer_ids() -> PackedInt32Array:
 	var ids := PackedInt32Array()
 	for peer_id in _players:
@@ -215,8 +243,19 @@ func set_input(peer_id: int, direction: Vector2, sequence: int) -> void:
 		return
 	var player: Player = _players[peer_id]
 	player.seconds_since_input = 0.0
+
+	# #141: a forward jump in sequence is a packet that never arrived. `submit_input` is
+	# `unreliable_ordered`, which discards a late or reordered packet rather than
+	# retransmitting it, so ordinary WAN reordering lands here as outright loss — and a
+	# lost input is one the client predicted and this server will never step.
+	if player.last_received_sequence >= 0 and sequence > player.last_received_sequence + 1:
+		player.input_flow["missing"] += sequence - player.last_received_sequence - 1
+	player.last_received_sequence = maxi(player.last_received_sequence, sequence)
+
 	player._input_queue.append({"sequence": sequence, "direction": direction})
+	var queued := player._input_queue.size()
 	player._input_queue = trim_input_queue(player._input_queue, MAX_QUEUED_INPUTS)
+	player.input_flow["dropped"] += queued - player._input_queue.size()
 
 
 ## Keeps only the newest `max_entries` of a buffered input queue — the server-side
@@ -230,6 +269,54 @@ static func trim_input_queue(
 	if queue.size() <= max_entries:
 		return queue
 	return queue.slice(queue.size() - max_entries, queue.size())
+
+
+## A fresh set of #141's input-flow counters, zeroed. One logging window's worth:
+## `_log_input_flow` prints and replaces them, so every line reads as what happened over
+## that window rather than a total since the match began.
+##
+## - `drained` — steps that consumed a queued entry of their own, the healthy case.
+## - `dry` — steps that found nothing queued and re-ran the held direction instead.
+## - `dropped` — entries `trim_input_queue` discarded at `MAX_QUEUED_INPUTS`.
+## - `missing` — sequence numbers that never arrived at all.
+## - `depth_total` / `depth_max` — backlog found by draining steps, summed and peak.
+static func new_input_flow() -> Dictionary:
+	return {
+		"drained": 0,
+		"dry": 0,
+		"dropped": 0,
+		"missing": 0,
+		"depth_total": 0,
+		"depth_max": 0,
+	}
+
+
+## One player's input flow over the last window, as the line that goes to the log.
+##
+## Static and pure — the averaging especially — so the arithmetic is testable without a
+## socket or a scene tree, the same shape `trim_input_queue` and `pick_spawn` are in.
+##
+## `dry` and `dropped`/`missing` are the two halves #141 exists to tell apart: a dry step
+## puts the server one step *ahead* of what the client predicted, a dropped or missing
+## input leaves it one step *behind*. Both show up on the client as the same unsigned
+## one-tick correction, which is why counting them separately here is the whole point.
+static func format_input_flow(peer_id: int, flow: Dictionary) -> String:
+	var drained: int = flow["drained"]
+	var average_depth := 0.0
+	if drained > 0:
+		average_depth = float(flow["depth_total"]) / float(drained)
+	return (
+		"[input-flow] peer=%d drained=%d dry=%d dropped=%d missing=%d depth_avg=%.2f depth_max=%d"
+		% [
+			peer_id,
+			drained,
+			flow["dry"],
+			flow["dropped"],
+			flow["missing"],
+			average_depth,
+			flow["depth_max"],
+		]
+	)
 
 
 ## Asks to begin a cast. Returns whether it was accepted, which is not the same as the
@@ -301,6 +388,11 @@ func step(delta: float) -> void:
 	if _snapshot_accumulator >= interval:
 		_snapshot_accumulator = fmod(_snapshot_accumulator, interval)
 		snapshot_ready.emit(build_snapshot())
+
+	_input_flow_accumulator += delta
+	if _input_flow_accumulator >= INPUT_FLOW_LOG_SECONDS:
+		_input_flow_accumulator = fmod(_input_flow_accumulator, INPUT_FLOW_LOG_SECONDS)
+		_log_input_flow()
 
 
 func build_snapshot() -> Array:
@@ -377,12 +469,39 @@ func _step_movement(player: Player, delta: float) -> void:
 		player.input = Vector2.ZERO
 		player._input_queue.clear()
 	elif not player._input_queue.is_empty():
+		var depth := player._input_queue.size()
+		player.input_flow["drained"] += 1
+		player.input_flow["depth_total"] += depth
+		player.input_flow["depth_max"] = maxi(player.input_flow["depth_max"], depth)
+
 		var entry: Dictionary = player._input_queue.pop_front()
 		player.input = entry["direction"]
 		player.last_input_sequence = entry["sequence"]
+	elif player.last_input_sequence >= 0:
+		# #141: nothing queued, so the step below re-runs the direction already held —
+		# a step with no input entry of its own, which the client's one-entry-one-step
+		# replay model has no way to know happened. Counted, not changed: whether that
+		# is worth fixing is #142's question, and this issue only measures.
+		player.input_flow["dry"] += 1
 
 	Movement.step(player.body, player.input, player.combatant.can_move())
 	player.combatant.position = player.body.global_position
+
+
+## Prints one window of #141's input-flow counters per player, then starts a fresh window.
+##
+## Stdout only. Nothing under `server/` may touch a drawing node, texture or audio — the
+## dedicated-server export stays headless and CI fails the deploy if art leaks in — and a
+## `print` is as far as this goes. Players with nothing at all to report are skipped, so
+## an idle arena logs nothing rather than a page of zeroes.
+func _log_input_flow() -> void:
+	for peer_id in _players:
+		var player: Player = _players[peer_id]
+		var flow: Dictionary = player.input_flow
+		var activity: int = flow["drained"] + flow["dry"] + flow["dropped"] + flow["missing"]
+		if activity > 0:
+			print(format_input_flow(peer_id, flow))
+		player.input_flow = new_input_flow()
 
 
 ## Ticks `_within_request_budget`'s rolling window. Its own doc comment explains why the
