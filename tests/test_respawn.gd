@@ -137,6 +137,32 @@ func test_you_do_not_come_back_next_to_your_killer() -> void:
 	)
 
 
+func test_the_respawn_countdown_starts_at_the_full_count() -> void:
+	# #136: the death overlay's number is this, read straight off the wire — not a
+	# client-side guess from `Constants.RESPAWN_SECONDS`.
+	await _duel()
+	server.combatant_of(3).take_damage(Constants.PLAYER_MAX_HEALTH)
+	assert_almost_eq(
+		server.respawn_countdown_of(3),
+		Constants.RESPAWN_SECONDS,
+		"a fresh death should start the count at the top"
+	)
+
+
+func test_the_respawn_countdown_ticks_down_and_clears_on_revive() -> void:
+	await _duel()
+	server.combatant_of(3).take_damage(Constants.PLAYER_MAX_HEALTH)
+	await _run(Constants.RESPAWN_SECONDS - 0.2)
+	assert_almost_eq(
+		server.respawn_countdown_of(3), 0.2, "the overlay should count down in real time", 0.05
+	)
+
+	await _run(0.4)
+	assert_eq(
+		server.respawn_countdown_of(3), 0.0, "the overlay should clear once you are back up"
+	)
+
+
 func test_the_body_moves_with_the_respawn() -> void:
 	# The collision body and the combatant have to agree, or the corpse's physics stays
 	# where it fell and blocks nothing while the player is drawn elsewhere.

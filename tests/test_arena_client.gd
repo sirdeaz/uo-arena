@@ -172,6 +172,39 @@ func test_a_cast_in_a_snapshot_is_drawn() -> void:
 	assert_eq(state.current_spell.mantra, "Kal Vas Flam", "and the mantra needs this")
 
 
+# ── Death overlay (#136) ────────────────────────────────────────────────────────
+
+
+func test_dying_shows_the_overlay_with_the_servers_own_countdown() -> void:
+	_roster([LOCAL, OTHER])
+	source.take_damage(Constants.PLAYER_MAX_HEALTH)
+	client.apply_snapshot([NetProtocol.encode_combatant(LOCAL, source, 0, 2.5)])
+	client._update_hud()
+	assert_true(client.hud.death_overlay.visible, "dying should show the overlay")
+
+
+func test_reviving_hides_the_overlay() -> void:
+	_roster([LOCAL, OTHER])
+	source.take_damage(Constants.PLAYER_MAX_HEALTH)
+	client.apply_snapshot([NetProtocol.encode_combatant(LOCAL, source, 0, 2.5)])
+	client._update_hud()
+
+	source.revive(Vector2.ZERO)
+	client.apply_snapshot([NetProtocol.encode_combatant(LOCAL, source)])
+	client._update_hud()
+	assert_false(client.hud.death_overlay.visible, "reviving should hide the overlay")
+
+
+func test_someone_elses_death_does_not_show_your_overlay() -> void:
+	_roster([LOCAL, OTHER])
+	source.take_damage(Constants.PLAYER_MAX_HEALTH)
+	client.apply_snapshot([NetProtocol.encode_combatant(OTHER, source, 0, 2.5)])
+	client._update_hud()
+	assert_false(
+		client.hud.death_overlay.visible, "an opponent dying is not your death"
+	)
+
+
 # ── Snapshot delivery cadence (#132) ────────────────────────────────────────────────
 #
 # `snapshot_gap_is_notable` is the decision behind `_log_snapshot_gap`'s console line,

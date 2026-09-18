@@ -55,6 +55,21 @@ func test_the_input_ack_is_readable_without_decoding_the_rest() -> void:
 	)
 
 
+func test_the_respawn_countdown_survives_the_trip() -> void:
+	# #136: the death overlay reads the server's real timer, not a client-side guess —
+	# which only works if the number actually rides the wire like health does.
+	assert_true(
+		NetProtocol.apply_record(NetProtocol.encode_combatant(7, source, 0, 2.5), mirror),
+		"a well-formed record should apply"
+	)
+	assert_almost_eq(mirror.respawn_countdown, 2.5, "the death overlay's countdown reads this")
+
+
+func test_a_living_combatant_carries_no_respawn_countdown() -> void:
+	assert_true(_round_trip(), "a well-formed record should apply")
+	assert_almost_eq(mirror.respawn_countdown, 0.0, "nobody alive is mid-respawn")
+
+
 func test_status_rings_survive_as_booleans() -> void:
 	source.apply_poison(8.0, 3.0)
 	source.apply_paralyze(4.0)

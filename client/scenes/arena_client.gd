@@ -416,9 +416,12 @@ func _update_hud() -> void:
 	lines.append("players in the arena: %d" % _fighters.size())
 	lines.append(_last_event)
 
-	if not fighter.combatant.is_alive():
+	if fighter.combatant.is_alive():
+		hud.clear_death_overlay()
+	else:
 		lines.append("")
-		lines.append("you died — back in a few seconds")
+		lines.append("you died — back in %.1fs" % fighter.combatant.respawn_countdown)
+		hud.show_death_countdown(fighter.combatant.respawn_countdown)
 
 	hud.set_readout("\n".join(lines))
 

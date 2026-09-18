@@ -173,6 +173,15 @@ func body_of(peer_id: int) -> PlayerBody:
 	return _players[peer_id].body
 
 
+## The real number that goes out on the wire in `RESPAWN_COUNTDOWN` — see
+## `NetProtocol.encode_combatant`'s own doc comment for why it lives on `Player` and not
+## `Combatant`.
+func respawn_countdown_of(peer_id: int) -> float:
+	if not _players.has(peer_id):
+		return 0.0
+	return _players[peer_id].respawn_countdown
+
+
 ## This player's #141 input-flow counters for the window in progress, or an empty
 ## dictionary if they are not on the roster. Read by the tests; the live server reads
 ## them through `_log_input_flow` instead.
@@ -391,7 +400,9 @@ func build_snapshot() -> Array:
 	for peer_id in _players:
 		var player: Player = _players[peer_id]
 		records.append(
-			NetProtocol.encode_combatant(peer_id, player.combatant, player.last_input_sequence)
+			NetProtocol.encode_combatant(
+				peer_id, player.combatant, player.last_input_sequence, player.respawn_countdown
+			)
 		)
 	return records
 

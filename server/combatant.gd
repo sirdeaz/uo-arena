@@ -19,6 +19,13 @@ var poison_damage_per_tick: float = 0.0
 var paralyze_seconds_remaining: float = 0.0
 var entity_state: EntityState
 
+## The server's real respawn timer, mirrored onto every client's copy of this combatant
+## by `NetProtocol.apply_record` — see its own doc comment. The authoritative timer is
+## `ArenaServer.Player.respawn_countdown`; this field only exists so a client mirror has
+## somewhere to receive it and the death overlay can read it every frame the way it
+## already reads `health`.
+var respawn_countdown: float = 0.0
+
 var _poison_tick_accumulator: float = 0.0
 
 

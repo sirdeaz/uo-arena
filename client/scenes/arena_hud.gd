@@ -41,6 +41,7 @@ const READOUT_TOP: float = 20.0
 
 @onready var cast_bar: CastBarUI = $CastBar
 @onready var readout: Label = $Readout
+@onready var death_overlay: DeathOverlayUI = $DeathOverlay
 
 var _bound_state: EntityState
 
@@ -77,3 +78,17 @@ func bind_cast_bar(state: EntityState) -> void:
 func set_readout(text: String) -> void:
 	if readout != null:
 		readout.text = text
+
+
+## The server's own respawn timer for the local player, read straight off the wire —
+## see `DeathOverlayUI`. Called every tick the local player is dead.
+func show_death_countdown(seconds: float) -> void:
+	if death_overlay != null:
+		death_overlay.set_countdown(seconds)
+
+
+## Called every tick the local player is alive; a no-op once the overlay is already
+## hidden.
+func clear_death_overlay() -> void:
+	if death_overlay != null:
+		death_overlay.clear()
