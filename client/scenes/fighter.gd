@@ -432,6 +432,33 @@ static func prediction_error(
 	return -1.0
 
 
+## Which *side* of the server that same prediction landed on, measured along the direction
+## the acked tick was actually travelling. `prediction_error`'s magnitude cannot say, and
+## the two sides are opposite faults wanting opposite fixes (#141):
+##
+## - **Negative** — the client ran further than the server did, so the server stepped one
+##   time fewer than the client predicted: an input it never simulated, either dropped at
+##   `ArenaServer.MAX_QUEUED_INPUTS` or lost outright by `unreliable_ordered`.
+## - **Positive** — the server ran further, so it took a step the client never predicted:
+##   a tick where nothing was queued and it re-ran the direction it was already holding.
+##
+## `0.0` when that tick was not travelling at all, or nothing is recorded for the
+## sequence: there is no direction to project onto, so there is no side to report. A
+## caller wanting to know whether a comparison happened at all asks `prediction_error`,
+## whose `-1.0` says so unambiguously.
+static func prediction_error_along_travel(
+	history: Array[Dictionary], acked_sequence: int, authoritative_position: Vector2
+) -> float:
+	for entry in history:
+		if entry["sequence"] == acked_sequence:
+			var direction: Vector2 = entry["direction"]
+			if direction.is_zero_approx():
+				return 0.0
+			var predicted: Vector2 = entry["predicted_after"]
+			return (authoritative_position - predicted).dot(direction.normalized())
+	return 0.0
+
+
 ## Keeps only the newest `max_entries` of a buffered input history. Static for the same
 ## reason `inputs_to_replay` is — see `INPUT_HISTORY_SECONDS`'s own doc comment for why
 ## this bound has to exist at all.
@@ -459,7 +486,11 @@ func receive_server_snapshot(position: Vector2, input_ack: int) -> void:
 			_input_history, input_ack, position, RECONCILIATION_AGREEMENT_TOLERANCE
 		)
 		if _pending_reconciliation:
-			_log_reconciliation(prediction_error(_input_history, input_ack, position))
+			_log_reconciliation(
+				input_ack,
+				prediction_error(_input_history, input_ack, position),
+				prediction_error_along_travel(_input_history, input_ack, position)
+			)
 		_server_input_ack = input_ack
 
 
@@ -473,9 +504,24 @@ func receive_server_snapshot(position: Vector2, input_ack: int) -> void:
 ## #132's report was specifically that corrections run hot right after joining and settle
 ## down after roughly thirty seconds — the age of the connection is the thing worth
 ## reading off this line, not the time of day.
-func _log_reconciliation(error: float) -> void:
+## `t=` and `error=` keep the exact shape #133 gave them, and the rest is appended: every
+## comparison in this chain is measured against sessions logged in that format, and
+## reformatting those two fields would silently invalidate the numbers already on #132.
+##
+## `ack=` and `along=` are #141's addition. `along=` is the signed half of the same
+## measurement — see `prediction_error_along_travel` for which sign means what. A
+## correction with nothing recorded for the ack gets its own line instead: printed as a
+## magnitude it read as a real `-1.0px` correction, when it is only `prediction_error`'s
+## "nothing to compare against" sentinel.
+func _log_reconciliation(ack: int, error: float, along: float) -> void:
 	var since_join := (Time.get_ticks_msec() - _joined_at_msec) / 1000.0
-	print("[reconciliation] t=+%.1fs error=%.1fpx" % [since_join, error])
+	if error < 0.0:
+		print("[reconciliation] t=+%.1fs no-prediction ack=%d" % [since_join, ack])
+		return
+	print(
+		"[reconciliation] t=+%.1fs error=%.1fpx ack=%d along=%+.1fpx"
+		% [since_join, error, ack, along]
+	)
 
 
 ## Pulls a remote fighter toward the server's version of where it is. Exponential rather
