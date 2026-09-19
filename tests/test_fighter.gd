@@ -426,6 +426,131 @@ func test_a_standing_tick_has_no_side_to_report() -> void:
 	)
 
 
+# ── Repeated acks, since #142 ────────────────────────────────────────────────────────
+#
+# `ArenaServer._step_movement`'s dry branch does not advance `last_input_sequence` when
+# nothing is queued, so a run of held-direction repeats can report the identical ack
+# across more than one snapshot. Comparing every one of those against
+# `_input_history`'s frozen `predicted_after` re-reports the same divergence a second
+# time — the "pairing" #141's live log first turned up. These are the pieces behind
+# comparing against the position the previous correction actually landed on instead.
+
+
+func test_is_repeated_ack_is_true_when_the_same_ack_repeats() -> void:
+	assert_true(Fighter.is_repeated_ack(5, 5), "the same ack twice in a row is a repeat")
+
+
+func test_is_repeated_ack_is_false_when_the_ack_advances() -> void:
+	assert_false(Fighter.is_repeated_ack(6, 5), "a new, higher ack is not a repeat")
+
+
+func test_is_repeated_ack_is_false_before_anything_has_ever_been_acked() -> void:
+	assert_false(
+		Fighter.is_repeated_ack(0, -1),
+		"-1 means nothing has been acked yet, not that ack 0 already repeated"
+	)
+
+
+func test_repeated_ack_error_is_the_distance_since_the_last_correction() -> void:
+	assert_almost_eq(
+		Fighter.repeated_ack_error(Vector2(200.0, 100.0), Vector2(210.0, 100.0)),
+		10.0,
+		"only the movement since the last correction counts, not the original divergence"
+	)
+
+
+func test_repeated_ack_already_agrees_within_tolerance() -> void:
+	assert_true(
+		Fighter.repeated_ack_already_agrees(Vector2.ZERO, Vector2(0.1, 0.0), 0.5),
+		"a repeat that hasn't moved meaningfully further since needs no second correction"
+	)
+
+
+func test_repeated_ack_already_agrees_is_false_past_tolerance() -> void:
+	assert_false(
+		Fighter.repeated_ack_already_agrees(Vector2.ZERO, Vector2(5.0, 0.0), 0.5),
+		"real further movement since the last correction is still a real divergence"
+	)
+
+
+func test_repeated_ack_error_along_travel_reads_the_held_direction_from_history() -> void:
+	var history: Array[Dictionary] = [
+		{"sequence": 0, "direction": Vector2.RIGHT, "can_move": true, "predicted_after": Vector2(40.0, 0.0)},
+	]
+	assert_almost_eq(
+		Fighter.repeated_ack_error_along_travel(history, 0, Vector2(200.0, 0.0), Vector2(210.0, 0.0)),
+		10.0,
+		"projected onto the held direction the dry hold keeps re-running, the same as a " +
+		"fresh correction's own along="
+	)
+
+
+func test_repeated_ack_error_along_travel_is_zero_once_the_entry_is_trimmed_out() -> void:
+	assert_almost_eq(
+		Fighter.repeated_ack_error_along_travel([], 0, Vector2.ZERO, Vector2(10.0, 0.0)),
+		0.0,
+		"nothing left to project onto still has to report something rather than error out"
+	)
+
+
+func test_a_repeated_ack_does_not_re_correct_for_a_divergence_already_fixed() -> void:
+	var fighter := FIGHTER_SCENE.instantiate()
+	fighter.server_driven = true
+	fighter.player_controlled = true
+	add_child(fighter)
+	fighter.global_position = Vector2(200.0, 100.0)
+
+	# Tick 0: no input pressed in a headless test, so this fighter stands still and
+	# records predicted_after = (200, 100) for sequence 0.
+	await get_tree().physics_frame
+
+	# First correction: the server reports a position past what the client's own
+	# prediction shows for this same ack — a genuine divergence.
+	fighter.receive_server_snapshot(Vector2(210.0, 100.0), 0)
+	assert_true(fighter.reconciliation_pending(), "a genuine divergence must still be caught")
+	await get_tree().physics_frame
+
+	# Second snapshot: the same ack repeats (another dry-hold tick, #142) but the
+	# server's position has not moved any further than what the last correction already
+	# accounted for.
+	fighter.receive_server_snapshot(Vector2(210.0, 100.0), 0)
+	assert_false(
+		fighter.reconciliation_pending(),
+		"comparing against the stale historical prediction would re-report the whole " +
+		"original divergence again for nothing new — comparing against where the last " +
+		"correction actually landed must not"
+	)
+	fighter.queue_free()
+
+
+func test_a_repeated_ack_still_corrects_for_a_genuinely_new_divergence() -> void:
+	var fighter := FIGHTER_SCENE.instantiate()
+	fighter.server_driven = true
+	fighter.player_controlled = true
+	add_child(fighter)
+	fighter.global_position = Vector2(200.0, 100.0)
+
+	await get_tree().physics_frame
+
+	fighter.receive_server_snapshot(Vector2(210.0, 100.0), 0)
+	await get_tree().physics_frame
+
+	# The same ack repeats again, and the server has moved further still — a second,
+	# genuinely new dry-hold step, not the same one being re-reported.
+	fighter.receive_server_snapshot(Vector2(220.0, 100.0), 0)
+	assert_true(
+		fighter.reconciliation_pending(),
+		"a repeated ack that keeps moving further is a real, new divergence and must " +
+		"still be corrected"
+	)
+	await get_tree().physics_frame
+	assert_true(
+		fighter.global_position.distance_to(Vector2(220.0, 100.0)) < 1.0,
+		"the correction must still converge to the server's latest position"
+	)
+	fighter.queue_free()
+
+
 # ── Reconciliation-burst summary, since #150 ─────────────────────────────────────────
 #
 # #149's first live sample had 24 individual `[reconciliation]` lines inside 1.8 seconds

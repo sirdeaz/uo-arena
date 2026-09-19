@@ -129,6 +129,14 @@ var _joined_at_msec: int = 0
 ## nothing yet to say any of it is stale.
 var _server_input_ack: int = -1
 
+## The authoritative `position` from the last snapshot `receive_server_snapshot` processed
+## for this fighter — kept so a *repeated* ack (`is_repeated_ack`) can measure only the
+## divergence that's genuinely new since then, rather than re-comparing against
+## `_input_history`'s frozen `predicted_after` and re-reporting a divergence the previous
+## correction already fixed (#142). Updated every snapshot, whether or not it triggered a
+## correction, so it always reflects the most recent authoritative position seen.
+var _last_reconciliation_position: Vector2 = Vector2.ZERO
+
 ## True from the moment a snapshot lands for this fighter *and* `receive_server_snapshot`
 ## could not confirm prediction already agrees with it, until the next
 ## `_physics_process` consumes it. Reconciliation happens on the physics tick, not in the
@@ -482,6 +490,52 @@ static func prediction_error_along_travel(
 	return 0.0
 
 
+## True when `new_ack` is the same sequence a previous snapshot already reported.
+## `ArenaServer._step_movement`'s dry branch does not advance `last_input_sequence` when
+## nothing is queued, so a run of held-direction repeats reports the identical ack across
+## more than one snapshot (#142) — comparing against `_input_history`'s frozen
+## `predicted_after` in that case would re-report the same divergence a second time,
+## which is the exact "pairing" #141's live log first turned up. `-1` means nothing has
+## ever been acked yet, which is a first snapshot, never a repeat of one.
+static func is_repeated_ack(new_ack: int, previous_ack: int) -> bool:
+	return previous_ack >= 0 and new_ack == previous_ack
+
+
+## The size of a correction on a *repeated* ack: distance from the position the previous
+## correction actually landed on (`_last_reconciliation_position`) to this snapshot's
+## authoritative position — only the movement genuinely new since then, not the whole
+## divergence `prediction_error`'s frozen historical entry would re-measure.
+static func repeated_ack_error(previous_position: Vector2, authoritative_position: Vector2) -> float:
+	return previous_position.distance_to(authoritative_position)
+
+
+## Whether a repeated ack's own error (see `repeated_ack_error`) is small enough to need
+## no second correction — the repeated-ack counterpart of `prediction_already_agrees`.
+static func repeated_ack_already_agrees(
+	previous_position: Vector2, authoritative_position: Vector2, tolerance: float
+) -> bool:
+	return repeated_ack_error(previous_position, authoritative_position) <= tolerance
+
+
+## The signed half of `repeated_ack_error`, along the direction `history` still has on
+## file for the repeated ack's own sequence — the same held direction
+## `ArenaServer._step_movement`'s dry branch keeps re-running, even though that entry's
+## own `predicted_after` is too stale to compare against directly. `0.0` when that entry
+## has since been trimmed out of `history`, or was never travelling: there is a real
+## error to report either way (see `repeated_ack_error`), just no side to put on it.
+static func repeated_ack_error_along_travel(
+	history: Array[Dictionary], acked_sequence: int,
+	previous_position: Vector2, authoritative_position: Vector2
+) -> float:
+	for entry in history:
+		if entry["sequence"] == acked_sequence:
+			var direction: Vector2 = entry["direction"]
+			if direction.is_zero_approx():
+				return 0.0
+			return (authoritative_position - previous_position).dot(direction.normalized())
+	return 0.0
+
+
 ## Keeps only the entries of `corrections` (each `{"at_msec": int, "error": float}`,
 ## `_note_correction_for_burst`'s own shape) still within `window_seconds` of `now_msec`
 ## — the sliding window a `[reconciliation-burst]` line is judged against. Static so the
@@ -550,19 +604,40 @@ static func trim_input_history(
 ## where the server itself says this same acked tick ended up, in which case there is
 ## nothing this snapshot needs corrected and the next `_physics_process` steps on
 ## exactly as if it had never arrived (#122).
+##
+## A *repeated* ack — `is_repeated_ack` — takes a different comparison: #142 found that
+## `ArenaServer`'s dry-hold branch can report the identical `input_ack` across more than
+## one snapshot, and comparing every one of those against `_input_history`'s frozen
+## `predicted_after` re-reports the same divergence again on top of what the previous
+## correction already fixed. Comparing against `_last_reconciliation_position` — where
+## that previous correction actually landed — measures only what's genuinely new since.
 func receive_server_snapshot(position: Vector2, input_ack: int) -> void:
 	server_position = position
 	if player_controlled:
-		_pending_reconciliation = not prediction_already_agrees(
-			_input_history, input_ack, position, RECONCILIATION_AGREEMENT_TOLERANCE
-		)
-		if _pending_reconciliation:
-			_log_reconciliation(
-				input_ack,
-				prediction_error(_input_history, input_ack, position),
-				prediction_error_along_travel(_input_history, input_ack, position)
+		if is_repeated_ack(input_ack, _server_input_ack):
+			_pending_reconciliation = not repeated_ack_already_agrees(
+				_last_reconciliation_position, position, RECONCILIATION_AGREEMENT_TOLERANCE
 			)
+			if _pending_reconciliation:
+				_log_reconciliation(
+					input_ack,
+					repeated_ack_error(_last_reconciliation_position, position),
+					repeated_ack_error_along_travel(
+						_input_history, input_ack, _last_reconciliation_position, position
+					)
+				)
+		else:
+			_pending_reconciliation = not prediction_already_agrees(
+				_input_history, input_ack, position, RECONCILIATION_AGREEMENT_TOLERANCE
+			)
+			if _pending_reconciliation:
+				_log_reconciliation(
+					input_ack,
+					prediction_error(_input_history, input_ack, position),
+					prediction_error_along_travel(_input_history, input_ack, position)
+				)
 		_server_input_ack = input_ack
+		_last_reconciliation_position = position
 
 
 ## Prints one line per real correction, so reconciliation frequency and size can be read
