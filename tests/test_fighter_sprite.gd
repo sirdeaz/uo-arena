@@ -124,58 +124,15 @@ func test_a_rotating_input_crosses_the_tie_only_once() -> void:
 	assert_eq(facing, RIGHT, "and land on the axis the sweep actually ended on")
 
 
-# ── Heading, once aim is in the picture ───────────────────────────────────────────
-
-
-func test_a_caster_turns_toward_what_they_are_casting_at() -> void:
-	# Standing still and throwing a flamestrike over your shoulder reads as a bug.
+func test_casting_does_not_change_which_way_you_face() -> void:
+	# #158: a caster used to turn toward its target regardless of where its feet were
+	# going, which read as a bug — standing still and throwing a flamestrike over your
+	# shoulder. Facing has exactly one input now: `facing_for` takes travel and nothing
+	# else, so a mage casting one way while walking another faces the way they walk.
 	assert_eq(
-		Fighter.heading_for(true, Vector2(400, 0), Vector2.ZERO, Vector2.ZERO, LEFT),
-		RIGHT,
-		"a caster should face their target even when their feet are not moving"
-	)
-
-
-func test_aim_beats_travel_while_casting() -> void:
-	# The deliberate act wins: a mage side-stepping behind a tent while throwing a spell
-	# down the lane is pointing at the spell, not at the tent.
-	assert_eq(
-		Fighter.heading_for(
-			true, Vector2(-400, 0), Vector2.ZERO, Vector2(0, 40), DOWN
-		),
-		LEFT,
-		"walking one way while casting another should point at the spell"
-	)
-
-
-func test_aim_says_nothing_when_you_are_not_casting() -> void:
-	assert_eq(
-		Fighter.heading_for(
-			false, Vector2(-400, 0), Vector2.ZERO, Vector2(0, 40), UP
-		),
+		Fighter.facing_for(Vector2(0, 40), LEFT),
 		DOWN,
-		"having a target selected must not turn you while you are simply walking"
-	)
-
-
-func test_a_fighter_with_no_target_falls_back_to_where_it_is_going() -> void:
-	# Every remote body is this case: a snapshot carries positions and state, never who
-	# anyone is aiming at.
-	assert_eq(
-		Fighter.heading_for(true, null, Vector2.ZERO, Vector2(0, -40), DOWN),
-		UP,
-		"a fighter nobody named a target to should still face the way it travels"
-	)
-
-
-func test_casting_at_your_own_feet_does_not_spin_you() -> void:
-	# Targets and casters overlap when two mages close; a zero-length aim says nothing.
-	assert_eq(
-		Fighter.heading_for(
-			true, Vector2(80, 80), Vector2(80, 80), Vector2.ZERO, RIGHT
-		),
-		RIGHT,
-		"a target standing on top of you must not decide which way you point"
+		"walking down while casting at a target to your left should still face down"
 	)
 
 

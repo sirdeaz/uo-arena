@@ -212,13 +212,6 @@ var _travel_speed: float = 0.0
 ## has no velocity of its own. It is held rather than reset when a fighter stops, so
 ## standing still leaves you facing the way you were last going.
 var _facing: Facing = Facing.DOWN
-
-## Who this fighter is casting at, when anyone knows. A caster turns to face their
-## target — standing still and throwing a flamestrike over your shoulder reads as a
-## bug — and only the local client knows its own target, so this is set rather than
-## inferred. Null leaves the heading to movement, which is what every remote fighter
-## falls back to.
-var _aim_at: Variant = null
 var _burst_remaining: float = 0.0
 var _burst_color: Color = Color.WHITE
 var _burst_expands: bool = true
@@ -875,26 +868,6 @@ static func facing_for(direction: Vector2, previous: Facing) -> Facing:
 	return Facing.DOWN if direction.y > 0.0 else Facing.UP
 
 
-## Which heading to show, given everything the client knows about a fighter this frame.
-##
-## A caster faces what they are casting at; everyone else faces where they are going. Aim
-## wins because it is the more deliberate act: a mage side-stepping behind a tent while
-## throwing a spell down the lane is pointing at the spell, not at the tent.
-##
-## `aim` is `null` for every fighter nobody has named a target to — a snapshot carries
-## positions and state, never intent, so every remote body falls back to travel and a
-## remote mage casting on the spot faces wherever it last walked. That is the known cost
-## of deriving heading client-side instead of paying for a ninth slot in the record; it
-## is written down in `docs/sprite-pipeline-readiness.md` rather than hidden here.
-static func heading_for(
-	casting: bool, aim: Variant, from: Vector2, travelled: Vector2, previous: Facing
-) -> Facing:
-	if casting and aim != null:
-		var at: Vector2 = aim
-		return facing_for(at - from, previous)
-	return facing_for(travelled, previous)
-
-
 ## The speed `animation_for` should judge WALK/IDLE against, given where this body
 ## actually was, where its own prediction (or lack of one) put it, and where it ended
 ## up after any server correction.
@@ -1076,27 +1049,15 @@ func _draw_footing() -> void:
 	)
 
 
-## Turns this fighter toward whatever it is casting at, or back to its heading of
-## travel. Called by whoever knows the target; `null` gives movement the say again.
-func aim_at(target: Variant) -> void:
-	_aim_at = target
-
-
 ## Which way this fighter is pointing. Public so a test can read it without drawing.
 func facing() -> Facing:
 	return _facing
 
 
-## Hands the frame's facts to `heading_for` above and keeps the answer. The decision
+## Hands the frame's travel to `facing_for` above and keeps the answer. The decision
 ## itself is a static, callable without a scene tree — see the section above.
 func _update_facing(travelled: Vector2) -> void:
-	_facing = heading_for(
-		combatant.entity_state.current_state == EntityState.State.CASTING,
-		_aim_at,
-		global_position,
-		travelled,
-		_facing
-	)
+	_facing = facing_for(travelled, _facing)
 
 
 ## Status, health and speech, above the character rather than on it.

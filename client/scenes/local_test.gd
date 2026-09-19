@@ -90,18 +90,9 @@ func _on_cast_completed(from: Fighter, to: Fighter, spell: SpellData) -> void:
 
 func _process(delta: float) -> void:
 	_run_dummy(delta)
-	_update_aim()
 	_stage.follow_camera(player.position, map.bounds())
 	_update_hud()
 	_sight_line.queue_redraw()
-
-
-## Both fighters know exactly who they are throwing at here, so both turn to face it.
-## Offline that is free — there is one opponent each — and it is what makes the practice
-## harness show the same heading a real duel will.
-func _update_aim() -> void:
-	player.aim_at(dummy.position)
-	dummy.aim_at(player.position)
 
 
 func _run_dummy(delta: float) -> void:
