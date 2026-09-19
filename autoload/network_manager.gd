@@ -115,6 +115,13 @@ func requested_port() -> int:
 	return int(value) if value.is_valid_int() else Constants.DEFAULT_PORT
 
 
+## The nickname a `--name <text>` asked to pre-fill the join menu with, or "" for none.
+## Not a trust boundary any wider than the field it fills in — the server still
+## sanitises whatever ends up typed there (`join_arena`, below).
+func requested_nickname() -> String:
+	return _flag_value("--name")
+
+
 func _has_flag(flag: String) -> bool:
 	return flag in OS.get_cmdline_args() or flag in OS.get_cmdline_user_args()
 

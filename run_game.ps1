@@ -5,6 +5,7 @@
 #   .\run_game.ps1 -Server              # run headless as a dedicated server
 #   .\run_game.ps1 -Connect 10.0.0.4    # join a server directly
 #   .\run_game.ps1 -Server -Port 24568  # either of the last two, on another port
+#   .\run_game.ps1 -Name Foo            # pre-fill the join menu's nickname field
 #
 # The Linux and macOS equivalent is ./run_game.sh, which takes the same forms.
 
@@ -12,7 +13,8 @@ param(
     [switch]$Editor,
     [switch]$Server,
     [string]$Connect,
-    [int]$Port
+    [int]$Port,
+    [string]$Name
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,6 +32,7 @@ if (-not $Editor) { Import-Project $godot }
 
 $extra = @()
 if ($Port) { $extra += @("--port", "$Port") }
+if ($Name) { $extra += @("--name", $Name) }
 
 if ($Editor) {
     & $godot --editor
