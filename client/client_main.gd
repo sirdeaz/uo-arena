@@ -36,6 +36,9 @@ func _ready() -> void:
 	_status.add_theme_color_override("font_color", Palette.UI_TEXT_ALERT)
 
 	_address.text = DEFAULT_ADDRESS
+	var nickname := NetworkManager.requested_nickname()
+	if nickname != "":
+		_nickname.text = nickname
 	_address.text_submitted.connect(func(text: String) -> void: _connect_to(text))
 	# Enter in the nickname field connects too, rather than doing nothing — the address
 	# is usually already filled in from last time, so the name is the field you land on.

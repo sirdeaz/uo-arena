@@ -6,6 +6,7 @@
 #   ./run_game.sh --server             # run headless as a dedicated server
 #   ./run_game.sh --connect 10.0.0.4   # join a server directly
 #   ./run_game.sh --server --port 24568   # either of the last two, on another port
+#   ./run_game.sh --name Foo           # pre-fill the join menu's nickname field
 #
 # The Windows equivalent is run_game.ps1, which takes the same forms.
 
@@ -18,6 +19,7 @@ editor=0
 server=0
 connect=""
 port=""
+name=""
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -33,8 +35,13 @@ while [ "$#" -gt 0 ]; do
             port=$2
             shift
             ;;
+        --name)
+            [ "$#" -ge 2 ] || { echo "--name needs a nickname." >&2; exit 2; }
+            name=$2
+            shift
+            ;;
         *)
-            echo "Unknown option '$1'. Use --editor, --server, --connect or --port." >&2
+            echo "Unknown option '$1'. Use --editor, --server, --connect, --port or --name." >&2
             exit 2
             ;;
     esac
@@ -53,6 +60,7 @@ require_godot_4 "$godot"
 # Everything after `--` is passed through to the game rather than the engine.
 set --
 [ -n "$port" ] && set -- "$@" --port "$port"
+[ -n "$name" ] && set -- "$@" --name "$name"
 
 if [ "$editor" -eq 1 ]; then
     exec "$godot" --editor
