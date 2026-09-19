@@ -330,6 +330,31 @@ func _log_snapshot_gap() -> void:
 	_last_snapshot_at_msec = now
 
 
+## `NetworkManager.receive_pong`'s payload: the client's own `Time.get_ticks_msec()` from
+## when `submit_ping` sent it, echoed back unread by the server. `NetworkManager` holds no
+## rules of its own — see its header comment — so the RTT arithmetic and the log line both
+## live here, the same split `apply_snapshot` already uses for `receive_snapshot`.
+func note_pong(client_send_msec: int) -> void:
+	var now := Time.get_ticks_msec()
+	var since_join := (now - _joined_at_msec) / 1000.0
+	print(format_rtt(since_join, Time.get_unix_time_from_system(), rtt_ms(client_send_msec, now)))
+
+
+## The round trip itself: how long between sending a ping and this same client seeing its
+## echo. Static so the arithmetic is checkable without a socket or a real clock.
+static func rtt_ms(sent_msec: int, now_msec: int) -> int:
+	return now_msec - sent_msec
+
+
+## Static and pure, the same shape `ArenaServer.format_input_flow` is in. Carries both
+## clocks #150 needs: `t=` since join, matching every other diagnostic line in this
+## project, and `wall=` real wall-clock time so an RTT reading can be lined up against the
+## server's own `[input-flow-event]` lines, which have no "since join" of their own to
+## share with a different process.
+static func format_rtt(since_join: float, wall: float, rtt: int) -> String:
+	return "[rtt] t=+%.1fs wall=%.3f rtt=%dms" % [since_join, wall, rtt]
+
+
 ## You are always blue; everyone else wears their slot. Keeping "blue is you" true is
 ## worth more mid-fight than giving yourself a unique colour would be — the first read
 ## is always "is that me", and it should cost nothing.

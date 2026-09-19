@@ -341,6 +341,31 @@ func test_format_input_flow_does_not_divide_by_a_window_that_drained_nothing() -
 	)
 
 
+# ── Per-event input-flow logging, since #150 ────────────────────────────────────────
+#
+# #141's counters only print as a 5-second aggregate, coarser than a live burst can be
+# (#149's first live sample had a 1.8-second one). `format_input_flow_event` is the line
+# printed the moment a dry/dropped/missing event itself happens, wall-clock stamped so it
+# can be lined up against the client's own logs — a different process, with no "since
+# join" clock in common.
+
+
+func test_format_input_flow_event_names_the_kind_and_count() -> void:
+	var line := ArenaServer.format_input_flow_event(1234.5, 7, "dry", 1)
+	assert_true(line.contains("peer=7"), "a line has to say which player it describes")
+	assert_true(line.contains("kind=dry"), "a line has to say which counter this event is")
+	assert_true(line.contains("count=1"), "a line has to say how many, not just that one happened")
+
+
+func test_format_input_flow_event_carries_wall_clock_not_since_join() -> void:
+	var line := ArenaServer.format_input_flow_event(1234.5, 7, "missing", 3)
+	assert_true(
+		line.contains("wall=1234.500"),
+		"the server and the client are different processes with no shared \"since join\" " +
+		"clock — correlating a burst across both logs needs one they actually share"
+	)
+
+
 # ── Cast requests a modified client could send ────────────────────────────────────
 
 

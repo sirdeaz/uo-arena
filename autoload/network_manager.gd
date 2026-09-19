@@ -26,6 +26,14 @@ const CONNECT_TIMEOUT_SECONDS: float = 5.0
 
 var _connecting_for: float = -1.0
 
+## How often the client sends a ping to measure round-trip time — #150, so a
+## `[reconciliation-burst]` can be checked against a concurrent latency spike rather than
+## inferred after the fact. Independent of `SNAPSHOT_HZ`: RTT is diagnostic only and has
+## no reason to ride the same cadence as the simulation's own state broadcast.
+const PING_INTERVAL_SECONDS: float = 1.0
+
+var _ping_accumulator: float = 0.0
+
 ## What the join screen asked to be called. Held from `join` until the connection is up,
 ## because `join_arena` cannot be sent until there is a server to send it to.
 var _pending_nickname: String = ""
@@ -45,11 +53,16 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _connecting_for < 0.0:
-		return
-	_connecting_for += delta
-	if _connecting_for >= CONNECT_TIMEOUT_SECONDS:
-		_return_to_menu("no answer from the server")
+	if _connecting_for >= 0.0:
+		_connecting_for += delta
+		if _connecting_for >= CONNECT_TIMEOUT_SECONDS:
+			_return_to_menu("no answer from the server")
+
+	if arena_client != null:
+		_ping_accumulator += delta
+		if _ping_accumulator >= PING_INTERVAL_SECONDS:
+			_ping_accumulator = fmod(_ping_accumulator, PING_INTERVAL_SECONDS)
+			submit_ping.rpc_id(1, Time.get_ticks_msec())
 
 
 # ── Command line ──────────────────────────────────────────────────────────────────
@@ -225,6 +238,7 @@ func join(address: String, port: int, nickname: String = "") -> Error:
 
 func _on_connected_to_server() -> void:
 	_connecting_for = -1.0
+	_ping_accumulator = 0.0
 
 	# Built and wired before it enters the tree, so `local_peer_id` is already correct
 	# when `_ready` runs and the first roster cannot arrive at a half-configured client.
@@ -328,6 +342,17 @@ func request_cast(spell_id: int, target_peer: int) -> void:
 	arena_server.request_cast(multiplayer.get_remote_sender_id(), spell_id, target_peer)
 
 
+## Round-trip timing only — #150. `client_send_msec` is the client's own
+## `Time.get_ticks_msec()`, meaningless to the server and echoed back verbatim rather than
+## read; the server keeps no state of its own for this, on purpose, since RTT is a
+## transport fact and not a rule `ArenaServer` has any business holding.
+@rpc("any_peer", "call_remote", "unreliable")
+func submit_ping(client_send_msec: int) -> void:
+	if not multiplayer.is_server():
+		return
+	receive_pong.rpc_id(multiplayer.get_remote_sender_id(), client_send_msec)
+
+
 # ── Server to clients ─────────────────────────────────────────────────────────────
 #
 # `authority` means only peer 1 is accepted, which is what stops a client forging any
@@ -365,3 +390,12 @@ func receive_roster(
 @rpc("authority", "call_remote", "reliable")
 func receive_rejected(reason: String) -> void:
 	_return_to_menu(reason)
+
+
+## `submit_ping`'s echo. `NetworkManager` holds no rules in return, per its own header —
+## the RTT arithmetic and the `[rtt]` line both belong on `ArenaClient`, the same split
+## `receive_snapshot` already uses.
+@rpc("authority", "call_remote", "unreliable")
+func receive_pong(client_send_msec: int) -> void:
+	if arena_client != null:
+		arena_client.note_pong(client_send_msec)
