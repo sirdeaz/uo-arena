@@ -79,6 +79,16 @@ const INPUT_HISTORY_SECONDS: float = 1.0
 ## known yet, like a status effect landing mid-flight — clears this by a wide margin.
 const RECONCILIATION_AGREEMENT_TOLERANCE: float = 0.5
 
+## How close together a run of real corrections has to land to read as one burst rather
+## than ordinary corrections spread thinly over a session — see `_note_correction_for_burst`.
+## #150's own motivation: #149's first live sample had 24 individual `[reconciliation]`
+## lines inside 1.8 seconds, and nothing summarized what that stretch actually added up to.
+const RECONCILIATION_BURST_WINDOW_SECONDS: float = 0.5
+
+## Below this many corrections inside `RECONCILIATION_BURST_WINDOW_SECONDS`, it reads as
+## independent one-off corrections, not a burst worth its own summary line.
+const RECONCILIATION_BURST_MIN_COUNT: int = 5
+
 @export var body_color: Color = Palette.PLAYER
 @export var player_controlled: bool = false
 
@@ -142,6 +152,14 @@ var _input_sequence: int = 0
 ## tick's own step — `prediction_already_agrees` reads it back against a later snapshot
 ## so an already-correct prediction never has to be recomputed by force (#122).
 var _input_history: Array[Dictionary] = []
+
+## `{"at_msec": int, "error": float}` dictionaries, oldest first — every real correction
+## (`Time.get_ticks_msec()` when it printed, and its `prediction_error`) still within
+## `RECONCILIATION_BURST_WINDOW_SECONDS` of the most recent one. Cleared the moment it
+## crosses `RECONCILIATION_BURST_MIN_COUNT` and prints its own summary — see
+## `_note_correction_for_burst`. Separate from `_input_history`, which is about replaying
+## inputs, not measuring how corrections cluster.
+var _recent_corrections: Array[Dictionary] = []
 
 ## Off by default. Getting yourself around cover is the skill this game is about, so this
 ## is an assist you switch on, not the way the game plays.
@@ -464,6 +482,54 @@ static func prediction_error_along_travel(
 	return 0.0
 
 
+## Keeps only the entries of `corrections` (each `{"at_msec": int, "error": float}`,
+## `_note_correction_for_burst`'s own shape) still within `window_seconds` of `now_msec`
+## — the sliding window a `[reconciliation-burst]` line is judged against. Static so the
+## windowing itself is checkable without a real clock.
+static func trim_recent_corrections(
+	corrections: Array[Dictionary], now_msec: int, window_seconds: float
+) -> Array[Dictionary]:
+	var window_msec := int(window_seconds * 1000.0)
+	var kept: Array[Dictionary] = []
+	for entry in corrections:
+		if now_msec - int(entry["at_msec"]) <= window_msec:
+			kept.append(entry)
+	return kept
+
+
+## `corrections`' own summary — how many, their total displacement, and the span from
+## the earliest to the latest. Assumes `corrections` is non-empty:
+## `_note_correction_for_burst` only ever calls this once the window already holds at
+## least `RECONCILIATION_BURST_MIN_COUNT`.
+static func summarize_reconciliation_burst(corrections: Array[Dictionary]) -> Dictionary:
+	var total_error := 0.0
+	var earliest_msec: int = corrections[0]["at_msec"]
+	var latest_msec: int = corrections[0]["at_msec"]
+	for entry in corrections:
+		total_error += float(entry["error"])
+		earliest_msec = mini(earliest_msec, int(entry["at_msec"]))
+		latest_msec = maxi(latest_msec, int(entry["at_msec"]))
+	return {
+		"count": corrections.size(),
+		"total_error": total_error,
+		"duration_seconds": (latest_msec - earliest_msec) / 1000.0,
+	}
+
+
+## Static and pure, the same shape `ArenaServer.format_input_flow_event` is in. `wall` is
+## real wall-clock time (`Time.get_unix_time_from_system()`), not "seconds since join" —
+## the server prints its own dry/dropped/missing events on that same clock, and lining a
+## burst up across the two processes' logs needs a clock they actually share (#150).
+static func format_reconciliation_burst(wall: float, summary: Dictionary) -> String:
+	return (
+		"[reconciliation-burst] wall=%.3f count=%d total=%.1fpx duration=%.0fms"
+		% [
+			wall, summary["count"], summary["total_error"],
+			summary["duration_seconds"] * 1000.0,
+		]
+	)
+
+
 ## Keeps only the newest `max_entries` of a buffered input history. Static for the same
 ## reason `inputs_to_replay` is — see `INPUT_HISTORY_SECONDS`'s own doc comment for why
 ## this bound has to exist at all.
@@ -527,6 +593,30 @@ func _log_reconciliation(ack: int, error: float, along: float) -> void:
 		"[reconciliation] t=+%.1fs error=%.1fpx ack=%d along=%+.1fpx"
 		% [since_join, error, ack, along]
 	)
+	_note_correction_for_burst(error)
+
+
+## Tracks real corrections (not `no-prediction` lines, which carry no magnitude) in a
+## sliding window, and prints a `[reconciliation-burst]` summary the moment
+## `RECONCILIATION_BURST_MIN_COUNT` of them land within `RECONCILIATION_BURST_WINDOW_SECONDS`
+## of each other — #150. A human reading a wall of individual `along=` lines during a
+## sub-two-second stretch (#149's first live sample: 24 of them in 1.8s) cannot easily see
+## the burst's own shape; this is that shape, in one line. Purely additive: nothing here
+## changes what `_log_reconciliation` already prints per correction.
+func _note_correction_for_burst(error: float) -> void:
+	var now := Time.get_ticks_msec()
+	_recent_corrections.append({"at_msec": now, "error": error})
+	_recent_corrections = trim_recent_corrections(
+		_recent_corrections, now, RECONCILIATION_BURST_WINDOW_SECONDS
+	)
+	if _recent_corrections.size() >= RECONCILIATION_BURST_MIN_COUNT:
+		print(
+			format_reconciliation_burst(
+				Time.get_unix_time_from_system(),
+				summarize_reconciliation_burst(_recent_corrections)
+			)
+		)
+		_recent_corrections.clear()
 
 
 ## Pulls a remote fighter toward the server's version of where it is. Exponential rather

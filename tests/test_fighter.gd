@@ -426,6 +426,72 @@ func test_a_standing_tick_has_no_side_to_report() -> void:
 	)
 
 
+# ── Reconciliation-burst summary, since #150 ─────────────────────────────────────────
+#
+# #149's first live sample had 24 individual `[reconciliation]` lines inside 1.8 seconds
+# — legible one at a time, but nothing said what that stretch actually added up to. These
+# are the static pieces behind the `[reconciliation-burst]` summary line.
+
+
+func test_trim_recent_corrections_drops_entries_outside_the_window() -> void:
+	var corrections: Array[Dictionary] = [
+		{"at_msec": 1000, "error": 3.75},
+		{"at_msec": 1400, "error": 3.75},
+	]
+	var kept := Fighter.trim_recent_corrections(corrections, 1600, 0.5)
+	assert_eq(
+		kept.size(), 1,
+		"an entry more than half a second behind `now` is not part of the current burst"
+	)
+	assert_eq(kept[0]["at_msec"], 1400, "the entry still inside the window must survive")
+
+
+func test_trim_recent_corrections_keeps_an_entry_right_at_the_edge() -> void:
+	var corrections: Array[Dictionary] = [{"at_msec": 1000, "error": 3.75}]
+	assert_eq(
+		Fighter.trim_recent_corrections(corrections, 1500, 0.5).size(), 1,
+		"exactly at the window's edge must still count as inside it"
+	)
+
+
+func test_summarize_reconciliation_burst_totals_and_spans_the_entries() -> void:
+	var corrections: Array[Dictionary] = [
+		{"at_msec": 1000, "error": 3.75},
+		{"at_msec": 1050, "error": 7.5},
+		{"at_msec": 1100, "error": 3.75},
+	]
+	var summary := Fighter.summarize_reconciliation_burst(corrections)
+	assert_eq(summary["count"], 3, "every entry handed in belongs to this burst")
+	assert_almost_eq(
+		summary["total_error"], 15.0,
+		"the summary is what a burst cost in total, not any single line's own size"
+	)
+	assert_almost_eq(
+		summary["duration_seconds"], 0.1,
+		"duration is the span from the earliest entry to the latest, not a count of ticks"
+	)
+
+
+func test_format_reconciliation_burst_names_count_total_and_duration() -> void:
+	var summary := {"count": 24, "total_error": 218.7, "duration_seconds": 1.8}
+	var line := Fighter.format_reconciliation_burst(1234.5, summary)
+	assert_true(line.contains("count=24"), "a burst line has to say how many corrections it covers")
+	assert_true(
+		line.contains("total=218.7px"), "and what they added up to, not just how many there were"
+	)
+	assert_true(line.contains("duration=1800ms"), "and how long the burst actually lasted")
+
+
+func test_format_reconciliation_burst_carries_wall_clock() -> void:
+	var summary := {"count": 5, "total_error": 18.75, "duration_seconds": 0.4}
+	var line := Fighter.format_reconciliation_burst(1234.5, summary)
+	assert_true(
+		line.contains("wall=1234.500"),
+		"a burst line needs a clock the server's own [input-flow-event] lines share, not " +
+		"only \"seconds since join\", which means nothing to a different process"
+	)
+
+
 # ── Reconciliation is skipped when it would be a no-op, since #122 ──────────────────
 
 

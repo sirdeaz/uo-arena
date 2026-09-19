@@ -235,6 +235,36 @@ func test_a_gap_just_under_the_threshold_is_not_notable() -> void:
 	)
 
 
+# ── RTT measurement, since #150 ──────────────────────────────────────────────────────
+#
+# Nothing in this project measured round-trip time before #150 — there was no way to
+# check whether a `[reconciliation-burst]` lined up with a concurrent latency spike or
+# not. `NetworkManager.submit_ping`/`receive_pong` do the round trip; these are the pure
+# pieces behind what `note_pong` does with the answer.
+
+
+func test_rtt_ms_is_the_gap_between_send_and_receipt() -> void:
+	assert_eq(
+		ArenaClient.rtt_ms(1000, 1080), 80,
+		"the round trip is simply how much later the echo came back than the ping left"
+	)
+
+
+func test_format_rtt_carries_both_the_since_join_and_wall_clocks() -> void:
+	var line := ArenaClient.format_rtt(12.3, 1234.5, 80)
+	assert_true(
+		line.contains("t=+12.3s"),
+		"t= keeps this line readable the same way every other diagnostic line in this " +
+		"project already is"
+	)
+	assert_true(
+		line.contains("wall=1234.500"),
+		"wall= is what lets an RTT reading be lined up against the server's own " +
+		"[input-flow-event] lines, a different process with no \"since join\" in common"
+	)
+	assert_true(line.contains("rtt=80ms"), "and the measurement itself has to be in the line")
+
+
 # ── Announced events ──────────────────────────────────────────────────────────────
 
 

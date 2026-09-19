@@ -279,13 +279,18 @@ func set_input(peer_id: int, direction: Vector2, sequence: int) -> void:
 	# retransmitting it, so ordinary WAN reordering lands here as outright loss — and a
 	# lost input is one the client predicted and this server will never step.
 	if player.last_received_sequence >= 0 and sequence > player.last_received_sequence + 1:
-		player.input_flow["missing"] += sequence - player.last_received_sequence - 1
+		var missing := sequence - player.last_received_sequence - 1
+		player.input_flow["missing"] += missing
+		_log_input_flow_event(peer_id, "missing", missing)
 	player.last_received_sequence = maxi(player.last_received_sequence, sequence)
 
 	player._input_queue.append({"sequence": sequence, "direction": direction})
 	var queued := player._input_queue.size()
 	player._input_queue = trim_input_queue(player._input_queue, MAX_QUEUED_INPUTS)
-	player.input_flow["dropped"] += queued - player._input_queue.size()
+	var dropped := queued - player._input_queue.size()
+	player.input_flow["dropped"] += dropped
+	if dropped > 0:
+		_log_input_flow_event(peer_id, "dropped", dropped)
 
 
 ## Keeps only the newest `max_entries` of a buffered input queue — the server-side
@@ -513,6 +518,7 @@ func _step_movement(player: Player, delta: float) -> void:
 		# replay model has no way to know happened. Counted, not changed: whether that
 		# is worth fixing is #142's question, and this issue only measures.
 		player.input_flow["dry"] += 1
+		_log_input_flow_event(player.peer_id, "dry", 1)
 
 	Movement.step(player.body, player.input, player.combatant.can_move())
 	player.combatant.position = player.body.global_position
@@ -532,6 +538,29 @@ func _log_input_flow() -> void:
 		if activity > 0:
 			print(format_input_flow(peer_id, flow))
 		player.input_flow = new_input_flow()
+
+
+## Prints the moment a dry/dropped/missing event actually happens, wall-clock stamped,
+## rather than only folded into `_log_input_flow`'s `INPUT_FLOW_LOG_SECONDS` aggregate.
+##
+## #149's first live review found bursts of `[reconciliation]` corrections on the
+## client lasting under two seconds — shorter than that 5-second window, which can span
+## several unrelated bursts and cannot say which one a given dry/dropped/missing count
+## belongs to (#150). Wall-clock rather than "seconds since something started" —
+## `server/` and the client are different processes with no shared clock of that kind,
+## and lining a client-side burst up against this needs a clock both sides actually
+## share. Purely additive: nothing here changes what `set_input`/`_step_movement` do,
+## only what gets printed alongside the counters they already keep.
+func _log_input_flow_event(peer_id: int, kind: String, count: int) -> void:
+	print(format_input_flow_event(Time.get_unix_time_from_system(), peer_id, kind, count))
+
+
+## Static and pure, the same shape `format_input_flow` is in — testable without a socket
+## or a scene tree.
+static func format_input_flow_event(wall: float, peer_id: int, kind: String, count: int) -> String:
+	return (
+		"[input-flow-event] wall=%.3f peer=%d kind=%s count=%d" % [wall, peer_id, kind, count]
+	)
 
 
 ## Ticks `_within_request_budget`'s rolling window. Its own doc comment explains why the
