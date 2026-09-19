@@ -5,9 +5,7 @@
 [ext_resource type="SpriteFrames" path="res://client/art/mage_frames.tres" id="3_frames"]
 [ext_resource type="Resource" path="res://client/art/fighter_chrome.tres" id="4_chrome"]
 [ext_resource type="Texture2D" uid="uid://byck52255s011" path="res://client/art/shadow.png" id="5_shadow"]
-
-[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_fx"]
-blend_mode = 1
+[ext_resource type="Material" path="res://client/shaders/spell_glow_material.tres" id="6_glow"]
 
 [node name="Fighter" instance=ExtResource("1_base")]
 script = ExtResource("2_fighter")
@@ -25,7 +23,7 @@ offset = Vector2(0, -34)
 
 [node name="FX" type="Node2D" parent="."]
 position = Vector2(0, -32)
-material = SubResource("CanvasItemMaterial_fx")
+material = ExtResource("6_glow")
 
 [node name="UI" type="Node2D" parent="."]
 texture_filter = 2

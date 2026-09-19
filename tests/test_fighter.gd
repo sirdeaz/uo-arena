@@ -79,12 +79,12 @@ func test_the_fx_layer_sits_at_the_chest_with_the_additive_material() -> void:
 		CHROME.chest,
 		"the FX layer has drifted from fighter_chrome.tres chest — the aura will pool at the ankles"
 	)
-	var material := fx.material as CanvasItemMaterial
-	assert_true(material != null, "without a material the additive glow just tints the robe")
+	var material := fx.material as ShaderMaterial
+	assert_true(material != null, "without the glow material the aura draws as flat shapes")
 	assert_eq(
-		material.blend_mode,
-		CanvasItemMaterial.BLEND_MODE_ADD,
-		"the authored FX material must stay additive"
+		material.shader.resource_path,
+		"res://client/shaders/spell_glow.gdshader",
+		"the FX layer must carry the glow shader — it is what draws the falloff, not just tints"
 	)
 
 
