@@ -9,8 +9,14 @@ class_name Combatant
 signal health_changed(new_health: float)
 signal died
 
-## Poison lands as discrete ticks, one per second, the way it reads in classic UO.
-const POISON_TICK_SECONDS: float = 1.0
+## Poison lands as discrete bites rather than a continuous drain, the way it reads in
+## classic UO. The interval is deliberately long enough to cast between: every bite is
+## damage, and damage breaks a spell (see `take_damage`), so this number decides how much
+## of a cast-denial tool poison is as much as it decides its rhythm (#147).
+##
+## A spell's own `effect_duration_seconds` is what sets how many bites it gets — see
+## `poison.tres`, whose duration is a whole multiple of this.
+const POISON_TICK_SECONDS: float = 2.75
 
 var position: Vector2 = Vector2.ZERO
 var health: float = Constants.PLAYER_MAX_HEALTH
