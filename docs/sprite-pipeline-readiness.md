@@ -146,8 +146,10 @@ Not one job. Each of these is its own issue:
 
 - ~~Does facing get derived client-side (free, slightly wrong for stationary remote
   casters) or carried on the wire (correct, costs a protocol bump)?~~ **Derived
-  client-side**, in #26. Still open in the form the answer left it: whether a remote
-  caster facing the wrong way is worth a 9th record slot.
+  client-side**, in #26. ~~Still open in the form the answer left it: whether a remote
+  caster facing the wrong way is worth a 9th record slot.~~ Moot as of #158: facing is
+  travel direction only, for local and remote fighters alike, so there is no
+  local/remote disagreement left to pay for.
 - Is the `ArenaView` invariant retired, or kept as a debug overlay?
 - What is the acceptable browser download size? That number decides the art budget more
   than taste does.

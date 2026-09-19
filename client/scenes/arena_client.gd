@@ -203,7 +203,6 @@ func last_event() -> String:
 
 func _physics_process(_delta: float) -> void:
 	_send_input()
-	_update_aim()
 	_update_camera()
 	_update_hud()
 	_sight_line.queue_redraw()
@@ -216,20 +215,6 @@ func _update_camera() -> void:
 	var fighter := _local_fighter()
 	var focus := fighter.position if fighter != null else map.bounds().get_center()
 	_stage.follow_camera(focus, map.bounds())
-
-
-## Turns you toward whoever you have selected. Only the local client knows its own
-## target — a snapshot carries positions and state, never intent — so this is set here,
-## and every remote fighter falls back to facing the way it is travelling.
-func _update_aim() -> void:
-	var fighter := _local_fighter()
-	if fighter == null:
-		return
-	if _fighters.has(_target_peer):
-		var target: Fighter = _fighters[_target_peer]
-		fighter.aim_at(target.position)
-	else:
-		fighter.aim_at(null)
 
 
 ## Sent every physics tick, unconditionally — not just on change plus an occasional
